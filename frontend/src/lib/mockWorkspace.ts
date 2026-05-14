@@ -647,6 +647,173 @@ export const SEED_RECENT_PARTS: MockRecentPart[] = [
   },
 ]
 
+// ── My Work items ────────────────────────────────────────────────────────────
+
+export type WorkItemKind =
+  | 'REVIEW_ASSIGNED'
+  | 'COMMENT_REPLY'
+  | 'DECISION_OWNED'
+  | 'PART_ASSIGNED'
+  | 'MENTION'
+
+export type WorkItemTab = 'assigned' | 'owned' | 'following'
+
+export interface MockWorkItem {
+  id: string
+  kind: WorkItemKind
+  tab: WorkItemTab
+  project_id: string
+  project_name: string
+  /** One-line title, e.g. "Wall thickness on inlet flange". */
+  title: string
+  /** Optional snippet (rationale, comment text). */
+  snippet?: string
+  /** Who created the work item — the requester from your POV. */
+  requester_name: string
+  requester_team: EngineeringTeam
+  /** Status — done is hidden by default; UI filters on this. */
+  status: 'OPEN' | 'RESPONDED' | 'DONE'
+  created_at: string // ISO
+  /** Optional due date for time-pressure. */
+  due_at?: string
+}
+
+export const SEED_WORK_ITEMS: MockWorkItem[] = [
+  // ── Assigned to me — Sarah Chen (CAE) flagged stress on Turbo Housing ──
+  {
+    id: 'w1',
+    kind: 'REVIEW_ASSIGNED',
+    tab: 'assigned',
+    project_id: 'proj_turbo',
+    project_name: 'Turbo Housing v3',
+    title: 'CAE review of revised inlet flange',
+    snippet:
+      'Sarah asked you to confirm the inlet flange revision before she runs final FEA.',
+    requester_name: 'Sarah Chen',
+    requester_team: 'CAE',
+    status: 'OPEN',
+    created_at: new Date(NOW - 35 * 60_000).toISOString(),
+    due_at: new Date(NOW + 18 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'w2',
+    kind: 'COMMENT_REPLY',
+    tab: 'assigned',
+    project_id: 'proj_intake',
+    project_name: 'Intake Manifold',
+    title: 'Re: hole pattern alignment',
+    snippet:
+      'John is waiting on your reply about whether the bosses can shift 0.3 mm.',
+    requester_name: 'John Williams',
+    requester_team: 'SUPPLIER',
+    status: 'OPEN',
+    created_at: new Date(NOW - 4 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'w3',
+    kind: 'PART_ASSIGNED',
+    tab: 'assigned',
+    project_id: 'proj_bracket',
+    project_name: 'Mounting Bracket Assembly',
+    title: 'Sign off draft 2 of the ECU bracket',
+    snippet:
+      'Maria is awaiting your sign-off so this can move into supplier feasibility.',
+    requester_name: 'Maria Garcia',
+    requester_team: 'REVIEWER',
+    status: 'OPEN',
+    created_at: new Date(NOW - 1 * DAYS).toISOString(),
+    due_at: new Date(NOW + 2 * DAYS).toISOString(),
+  },
+
+  // ── Owned by me — decisions/comments you authored, still open ──
+  {
+    id: 'w4',
+    kind: 'DECISION_OWNED',
+    tab: 'owned',
+    project_id: 'proj_gear',
+    project_name: 'Planetary Gear Set',
+    title: 'Tighten tolerance on sun gear bearing seat',
+    snippet:
+      'You proposed ±0.02 mm. Awaiting CAE confirmation on tolerance stack feasibility.',
+    requester_name: 'You',
+    requester_team: 'DESIGN',
+    status: 'OPEN',
+    created_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'w5',
+    kind: 'DECISION_OWNED',
+    tab: 'owned',
+    project_id: 'proj_turbo',
+    project_name: 'Turbo Housing v3',
+    title: 'Switch material to A356-T6 cast aluminium',
+    snippet:
+      'You suggested swapping from A356-T5 for better fatigue life. Waiting on supplier feedback.',
+    requester_name: 'You',
+    requester_team: 'DESIGN',
+    status: 'RESPONDED',
+    created_at: new Date(NOW - 1 * DAYS).toISOString(),
+  },
+
+  // ── Following — projects you watch but aren't actively driving ──
+  {
+    id: 'w6',
+    kind: 'MENTION',
+    tab: 'following',
+    project_id: 'proj_intake',
+    project_name: 'Intake Manifold',
+    title: 'CFD report v2 attached',
+    snippet:
+      'Sarah uploaded a revised CFD report with updated runner geometry. No action needed; FYI.',
+    requester_name: 'Sarah Chen',
+    requester_team: 'CAE',
+    status: 'OPEN',
+    created_at: new Date(NOW - 6 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'w7',
+    kind: 'MENTION',
+    tab: 'following',
+    project_id: 'proj_plate',
+    project_name: 'Engine Mount Plate',
+    title: 'Vibration test results',
+    snippet:
+      'David shared bench-test data — all 3 isolators pass spec at the high end of operating temp.',
+    requester_name: 'David Kim',
+    requester_team: 'MANUFACTURING',
+    status: 'OPEN',
+    created_at: new Date(NOW - 9 * 3_600_000).toISOString(),
+  },
+  {
+    id: 'w8',
+    kind: 'MENTION',
+    tab: 'following',
+    project_id: 'proj_gear',
+    project_name: 'Planetary Gear Set',
+    title: 'Approved by QA',
+    snippet:
+      'Maria signed off — ready for supplier feasibility quotes.',
+    requester_name: 'Maria Garcia',
+    requester_team: 'REVIEWER',
+    status: 'OPEN',
+    created_at: new Date(NOW - 1 * DAYS).toISOString(),
+  },
+  {
+    id: 'w9',
+    kind: 'MENTION',
+    tab: 'following',
+    project_id: 'proj_bracket',
+    project_name: 'Mounting Bracket Assembly',
+    title: 'Topology optimisation v2',
+    snippet:
+      'Sarah pushed an updated topology optimisation result with -22% mass and equivalent stiffness.',
+    requester_name: 'Sarah Chen',
+    requester_team: 'CAE',
+    status: 'OPEN',
+    created_at: new Date(NOW - 2 * DAYS).toISOString(),
+  },
+]
+
 // ── Pending decisions awaiting review ────────────────────────────────────────
 
 export interface MockPendingDecision {

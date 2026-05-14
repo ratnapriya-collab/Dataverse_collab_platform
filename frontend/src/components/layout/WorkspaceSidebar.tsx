@@ -31,7 +31,7 @@ import Avatar from '@/components/workspace/Avatar'
 import { SEED_PROJECTS } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
-export type SidebarSection = 'dashboard' | 'projects' | 'admin'
+export type SidebarSection = 'dashboard' | 'my_work' | 'projects' | 'admin'
 
 interface NavItem {
   id: SidebarSection

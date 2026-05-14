@@ -8,11 +8,97 @@
 
 export type WorkspaceRole = 'ADMIN' | 'MEMBER' | 'VIEWER'
 
+/**
+ * The engineering function this person fills inside the org. Distinct from
+ * `WorkspaceRole` (admin/member/viewer) which is permissions only — `team`
+ * tells the UI what colour / icon / context to use when displaying them.
+ *
+ * Design        — owns the geometry, creates and revises parts
+ * CAE           — runs FEA/CFD/tolerance analysis, validates
+ * Supplier      — external party manufacturing the part
+ * Reviewer      — QA, OEM sign-off, regulatory
+ * Manufacturing — internal production engineering
+ */
+export type EngineeringTeam =
+  | 'DESIGN'
+  | 'CAE'
+  | 'SUPPLIER'
+  | 'REVIEWER'
+  | 'MANUFACTURING'
+
+export interface TeamMeta {
+  label: string
+  abbr: string
+  /** Tailwind text colour class (used inline). */
+  text: string
+  /** Tailwind background colour class for pills (50-tier). */
+  bg: string
+  /** Border colour for the pill (200-tier). */
+  border: string
+  /** Hex for SVG fill (used by PipelineStrip). */
+  hex: string
+}
+
+export const TEAM_META: Record<EngineeringTeam, TeamMeta> = {
+  DESIGN: {
+    label: 'Design',
+    abbr: 'DES',
+    text: 'text-violet-700',
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
+    hex: '#7c3aed',
+  },
+  CAE: {
+    label: 'CAE',
+    abbr: 'CAE',
+    text: 'text-sky-700',
+    bg: 'bg-sky-50',
+    border: 'border-sky-200',
+    hex: '#0284c7',
+  },
+  SUPPLIER: {
+    label: 'Supplier',
+    abbr: 'SUP',
+    text: 'text-amber-700',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    hex: '#d97706',
+  },
+  REVIEWER: {
+    label: 'Reviewer',
+    abbr: 'REV',
+    text: 'text-emerald-700',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    hex: '#059669',
+  },
+  MANUFACTURING: {
+    label: 'Mfg',
+    abbr: 'MFG',
+    text: 'text-rose-700',
+    bg: 'bg-rose-50',
+    border: 'border-rose-200',
+    hex: '#e11d48',
+  },
+}
+
+/** Order used by PipelineStrip and team-filter pickers — left to right is
+ *  the natural lifecycle of a part. */
+export const TEAM_ORDER: EngineeringTeam[] = [
+  'DESIGN',
+  'CAE',
+  'REVIEWER',
+  'SUPPLIER',
+  'MANUFACTURING',
+]
+
 export interface MockMember {
   id: string
   name: string
   email: string
   role: WorkspaceRole
+  /** Their engineering function. Drives team badges across the UI. */
+  team: EngineeringTeam
   joined_at: string // ISO
   last_active_at: string // ISO
   /** True for the row representing the currently signed-in user. */
@@ -92,6 +178,7 @@ export const SEED_MEMBERS: MockMember[] = [
     name: 'You',
     email: 'you@example.com',
     role: 'ADMIN',
+    team: 'DESIGN',
     joined_at: new Date(NOW - 90 * DAYS).toISOString(),
     last_active_at: new Date(NOW - 30_000).toISOString(),
     online: true,
@@ -102,6 +189,7 @@ export const SEED_MEMBERS: MockMember[] = [
     name: 'Sarah Chen',
     email: 'sarah.chen@acme-supplier.com',
     role: 'MEMBER',
+    team: 'CAE',
     joined_at: new Date(NOW - 32 * DAYS).toISOString(),
     last_active_at: new Date(NOW - 5 * 60_000).toISOString(),
     online: true,
@@ -111,6 +199,7 @@ export const SEED_MEMBERS: MockMember[] = [
     name: 'John Williams',
     email: 'jwilliams@oem.industries',
     role: 'MEMBER',
+    team: 'SUPPLIER',
     joined_at: new Date(NOW - 18 * DAYS).toISOString(),
     last_active_at: new Date(NOW - 4 * 3_600_000).toISOString(),
   },
@@ -119,6 +208,7 @@ export const SEED_MEMBERS: MockMember[] = [
     name: 'Maria Garcia',
     email: 'maria.g@dataverse.io',
     role: 'VIEWER',
+    team: 'REVIEWER',
     joined_at: new Date(NOW - 9 * DAYS).toISOString(),
     last_active_at: new Date(NOW - 2 * DAYS).toISOString(),
   },
@@ -127,6 +217,7 @@ export const SEED_MEMBERS: MockMember[] = [
     name: 'David Kim',
     email: 'david.kim@acme-supplier.com',
     role: 'ADMIN',
+    team: 'MANUFACTURING',
     joined_at: new Date(NOW - 4 * DAYS).toISOString(),
     last_active_at: new Date(NOW - 25 * 60_000).toISOString(),
     online: true,
@@ -254,6 +345,11 @@ export const SEED_NOTIFICATIONS: MockNotification[] = [
 // ── Projects ─────────────────────────────────────────────────────────────────
 
 export type ProjectStatus = 'ACTIVE' | 'IN_REVIEW' | 'APPROVED' | 'ARCHIVED'
+
+/** Per-team handoff state. */
+export type PipelineStage = 'DONE' | 'IN_PROGRESS' | 'PENDING' | 'BLOCKED'
+
+export type ProjectPipeline = Record<EngineeringTeam, PipelineStage>
 export type ProjectShape = 'gear' | 'bracket' | 'housing' | 'cylinder' | 'plate' | 'manifold'
 export type ProjectTone = 'cyan' | 'amber' | 'emerald' | 'rose' | 'violet' | 'slate' | 'sky'
 
@@ -269,6 +365,8 @@ export interface MockProject {
   /** Names from SEED_MEMBERS — used to render an avatar stack. */
   member_names: string[]
   last_activity_at: string
+  /** Per-team handoff status — drives the PipelineStrip on project cards. */
+  pipeline: ProjectPipeline
 }
 
 export const SEED_PROJECTS: MockProject[] = [
@@ -284,6 +382,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 3,
     member_names: ['You', 'Sarah Chen', 'David Kim'],
     last_activity_at: new Date(NOW - 25 * 60_000).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'DONE',
+      REVIEWER: 'IN_PROGRESS',
+      SUPPLIER: 'PENDING',
+      MANUFACTURING: 'PENDING',
+    },
   },
   {
     id: 'proj_bracket',
@@ -297,6 +402,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 1,
     member_names: ['You', 'John Williams', 'Maria Garcia'],
     last_activity_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'IN_PROGRESS',
+      REVIEWER: 'PENDING',
+      SUPPLIER: 'PENDING',
+      MANUFACTURING: 'PENDING',
+    },
   },
   {
     id: 'proj_gear',
@@ -310,6 +422,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 0,
     member_names: ['Sarah Chen', 'David Kim'],
     last_activity_at: new Date(NOW - 1 * DAYS).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'DONE',
+      REVIEWER: 'DONE',
+      SUPPLIER: 'IN_PROGRESS',
+      MANUFACTURING: 'PENDING',
+    },
   },
   {
     id: 'proj_intake',
@@ -323,6 +442,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 2,
     member_names: ['You', 'Sarah Chen', 'John Williams', 'Maria Garcia'],
     last_activity_at: new Date(NOW - 4 * 3_600_000).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'IN_PROGRESS',
+      REVIEWER: 'PENDING',
+      SUPPLIER: 'BLOCKED',
+      MANUFACTURING: 'PENDING',
+    },
   },
   {
     id: 'proj_plate',
@@ -336,6 +462,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 4,
     member_names: ['Maria Garcia', 'David Kim'],
     last_activity_at: new Date(NOW - 9 * 3_600_000).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'DONE',
+      REVIEWER: 'IN_PROGRESS',
+      SUPPLIER: 'PENDING',
+      MANUFACTURING: 'PENDING',
+    },
   },
   {
     id: 'proj_cooling',
@@ -349,6 +482,13 @@ export const SEED_PROJECTS: MockProject[] = [
     open_comments: 0,
     member_names: ['John Williams'],
     last_activity_at: new Date(NOW - 45 * DAYS).toISOString(),
+    pipeline: {
+      DESIGN: 'DONE',
+      CAE: 'DONE',
+      REVIEWER: 'DONE',
+      SUPPLIER: 'DONE',
+      MANUFACTURING: 'DONE',
+    },
   },
 ]
 

@@ -81,7 +81,8 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <WorkspaceSidebar user={user} current="files" onSignOut={handleSignOut} />
+      {/* /home is a secondary upload surface — no sidebar item to highlight. */}
+      <WorkspaceSidebar user={user} onSignOut={handleSignOut} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">

@@ -158,6 +158,99 @@ export const SEED_INVITES: MockInvite[] = [
   },
 ]
 
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationKind =
+  | 'mention'
+  | 'comment'
+  | 'invite'
+  | 'decision_accepted'
+  | 'decision_rejected'
+  | 'member_joined'
+  | 'part_uploaded'
+
+export interface MockNotification {
+  id: string
+  kind: NotificationKind
+  actor_name: string
+  /** Verb phrase like "commented on" or "accepted your decision on". */
+  message: string
+  target_label?: string
+  target_href?: string
+  created_at: string
+  unread: boolean
+}
+
+export const SEED_NOTIFICATIONS: MockNotification[] = [
+  {
+    id: 'n1',
+    kind: 'comment',
+    actor_name: 'Sarah Chen',
+    message: 'commented on',
+    target_label: 'Turbo Housing v3',
+    target_href: '/projects/proj_turbo',
+    created_at: new Date(NOW - 5 * 60_000).toISOString(),
+    unread: true,
+  },
+  {
+    id: 'n2',
+    kind: 'decision_accepted',
+    actor_name: 'David Kim',
+    message: 'accepted your decision on',
+    target_label: 'Planetary Gear Set',
+    target_href: '/projects/proj_gear',
+    created_at: new Date(NOW - 45 * 60_000).toISOString(),
+    unread: true,
+  },
+  {
+    id: 'n3',
+    kind: 'mention',
+    actor_name: 'John Williams',
+    message: 'mentioned you on',
+    target_label: 'Intake Manifold',
+    target_href: '/projects/proj_intake',
+    created_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+    unread: true,
+  },
+  {
+    id: 'n4',
+    kind: 'invite',
+    actor_name: 'David Kim',
+    message: 'invited',
+    target_label: 'priya.s@oem.industries',
+    created_at: new Date(NOW - 6 * 3_600_000).toISOString(),
+    unread: false,
+  },
+  {
+    id: 'n5',
+    kind: 'part_uploaded',
+    actor_name: 'Sarah Chen',
+    message: 'uploaded a new part to',
+    target_label: 'Mounting Bracket Assembly',
+    target_href: '/projects/proj_bracket',
+    created_at: new Date(NOW - 1 * DAYS).toISOString(),
+    unread: false,
+  },
+  {
+    id: 'n6',
+    kind: 'member_joined',
+    actor_name: 'Maria Garcia',
+    message: 'joined the workspace',
+    created_at: new Date(NOW - 2 * DAYS).toISOString(),
+    unread: false,
+  },
+  {
+    id: 'n7',
+    kind: 'decision_rejected',
+    actor_name: 'David Kim',
+    message: 'rejected a decision on',
+    target_label: 'Cooling System (legacy)',
+    target_href: '/projects/proj_cooling',
+    created_at: new Date(NOW - 4 * DAYS).toISOString(),
+    unread: false,
+  },
+]
+
 // ── Projects ─────────────────────────────────────────────────────────────────
 
 export type ProjectStatus = 'ACTIVE' | 'IN_REVIEW' | 'APPROVED' | 'ARCHIVED'

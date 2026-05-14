@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
+import NotificationsBell from '@/components/layout/NotificationsBell'
 import Avatar, { AvatarStack } from '@/components/workspace/Avatar'
 import ProjectThumbnail from '@/components/workspace/ProjectThumbnail'
 import { ApiError, api } from '@/lib/api'
@@ -184,7 +185,8 @@ export default function ProjectPage() {
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationsBell />
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"

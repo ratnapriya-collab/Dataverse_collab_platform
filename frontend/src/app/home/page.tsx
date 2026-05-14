@@ -7,6 +7,8 @@ import { Building2, Shield } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UploadDropzone from '@/components/ui/UploadDropzone'
 import UserBadge from '@/components/ui/UserBadge'
+import NotificationsBell from '@/components/layout/NotificationsBell'
+import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_WORKSPACE } from '@/lib/mockWorkspace'
@@ -107,7 +109,9 @@ export default function HomePage() {
               </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <QuickSearchTrigger />
+            <NotificationsBell />
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"

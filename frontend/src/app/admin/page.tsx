@@ -19,6 +19,8 @@ import {
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
+import NotificationsBell from '@/components/layout/NotificationsBell'
+import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
 import MembersTab from '@/components/admin/MembersTab'
 import InvitesTab from '@/components/admin/InvitesTab'
 import SettingsTab from '@/components/admin/SettingsTab'
@@ -193,7 +195,9 @@ export default function AdminPage() {
               </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <QuickSearchTrigger />
+            <NotificationsBell />
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"

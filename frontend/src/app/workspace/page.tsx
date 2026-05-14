@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
+import NotificationsBell from '@/components/layout/NotificationsBell'
+import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
 import ActivityFeed from '@/components/workspace/ActivityFeed'
 import { AvatarStack } from '@/components/workspace/Avatar'
 import PendingDecisionsCard from '@/components/workspace/PendingDecisionsCard'
@@ -262,7 +264,9 @@ function Navbar({ user, onSignOut }: { user: UserRead; onSignOut: () => void }) 
             </Link>
           </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <QuickSearchTrigger />
+          <NotificationsBell />
           <UserBadge name={user.name} email={user.email} />
           <button
             type="button"

@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Viewer styles — scoped to .dv-viewer-shell so they don't leak. */
+@import '../_viewer/index.css';
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Auth-page background — soft mesh gradient with two blurred colour orbs.
+   Applied to /login and /register. Login card itself stays unchanged.
+   ───────────────────────────────────────────────────────────────────────── */
+.auth-bg {
+  position: relative;
+  background:
+    radial-gradient(ellipse 900px 700px at 12% 88%, rgba(21, 82, 74, 0.16), transparent 60%),
+    radial-gradient(ellipse 900px 700px at 88% 12%, rgba(6, 182, 212, 0.18), transparent 60%),
+    radial-gradient(ellipse 600px 600px at 50% 50%, rgba(255, 255, 255, 0.6), transparent 70%),
+    linear-gradient(135deg, #f8fafc 0%, #eef2f7 60%, #f1f5f9 100%);
+  overflow: hidden;
+}
+
+/* Soft animated blobs floating in the background — subtle, slow. */
+.auth-bg::before,
+.auth-bg::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-bg::before {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  left: -120px;
+  background: radial-gradient(circle, #15524a 0%, transparent 70%);
+  animation: authblob 18s ease-in-out infinite;
+}
+.auth-bg::after {
+  width: 480px;
+  height: 480px;
+  bottom: -160px;
+  right: -160px;
+  background: radial-gradient(circle, #06b6d4 0%, transparent 70%);
+  animation: authblob 22s ease-in-out infinite reverse;
+}
+
+@keyframes authblob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(40px, -30px) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg::before,
+  .auth-bg::after {
+    animation: none;
+  }
+}
+

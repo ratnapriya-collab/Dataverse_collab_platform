@@ -1,0 +1,105 @@
+import { useRef, useState } from 'react'
+import { Upload, LayoutGrid, Box } from 'lucide-react'
+import { useViewerStore } from '../../store/viewerStore'
+import { loadFile, loadSampleGeometry, buildTreeFromMeshes } from '../../lib/babylon/ModelLoader'
+import { applyShadingMode, getModelMeshes } from '../../lib/babylon/ShadingManager'
+import { fitToScene } from '../../lib/babylon/CameraManager'
+
+interface Props {
+  onFileLoaded?: (name: string) => void
+}
+
+export default function TopBar({ onFileLoaded }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const babylonScene = useViewerStore((s) => s.babylonScene)
+  const cameraRef    = useViewerStore((s) => s.cameraRef)
+  const shadingMode  = useViewerStore((s) => s.shadingMode)
+  const setModelTree       = useViewerStore((s) => s.setModelTree)
+  const setPmiAnnotations  = useViewerStore((s) => s.setPmiAnnotations)
+  const [loadingMsg, setLoadingMsg] = useState<string | null>(null)
+  const [fileName, setFileName]     = useState<string | null>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !babylonScene || !cameraRef) return
+    const toRemove = getModelMeshes(babylonScene)
+    toRemove.forEach((m) => m.dispose())
+    setModelTree([])
+    try {
+      const { meshes, tree, pmi } = await loadFile(file, babylonScene, (msg) => setLoadingMsg(msg || null))
+      setModelTree(tree)
+      setPmiAnnotations(pmi)
+      applyShadingMode(shadingMode, meshes)
+      fitToScene(cameraRef, meshes)
+      setFileName(file.name)
+      onFileLoaded?.(file.name)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('Load error:', err)
+      alert(`Failed to load file:\n${msg}`)
+    } finally {
+      setLoadingMsg(null)
+    }
+    e.target.value = ''
+  }
+
+  const handleLoadSample = () => {
+    if (!babylonScene || !cameraRef) return
+    const toRemove = getModelMeshes(babylonScene)
+    toRemove.forEach((m) => m.dispose())
+    const meshes = loadSampleGeometry(babylonScene)
+    setModelTree(buildTreeFromMeshes(meshes))
+    applyShadingMode(shadingMode, meshes)
+    fitToScene(cameraRef, babylonScene.meshes.slice())
+    setFileName('Sample Geometry')
+    onFileLoaded?.('Sample Geometry')
+  }
+
+  return (
+    <div className="topbar">
+      <div className="topbar-brand">
+        <div className="topbar-logo">
+          <Box size={14} color="#fff" strokeWidth={2} />
+        </div>
+        <span className="topbar-title">3D Viewer</span>
+      </div>
+
+      <div className="topbar-sep" />
+
+      <button
+        className="topbar-btn"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={!!loadingMsg}
+      >
+        <Upload size={12} />
+        Load Model
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".glb,.gltf,.stp,.step"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      <button
+        className="topbar-btn"
+        onClick={handleLoadSample}
+        disabled={!!loadingMsg}
+      >
+        <LayoutGrid size={12} />
+        Sample
+      </button>
+
+      {loadingMsg && (
+        <span style={{ fontSize: 10.5, color: 'var(--accent)', marginLeft: 8, fontFamily: 'monospace' }}>
+          {loadingMsg}
+        </span>
+      )}
+
+      {fileName && !loadingMsg && (
+        <span className="topbar-filename">{fileName}</span>
+      )}
+    </div>
+  )
+}

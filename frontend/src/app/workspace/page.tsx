@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Building2,
-  Crown,
   FolderKanban,
   MailPlus,
   MessageSquare,
@@ -13,11 +12,9 @@ import {
   Search,
   Users,
 } from 'lucide-react'
-import Logo from '@/components/ui/Logo'
-import UserBadge from '@/components/ui/UserBadge'
 import NotificationsBell from '@/components/layout/NotificationsBell'
 import QuickActionsFAB from '@/components/layout/QuickActionsFAB'
-import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
+import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import ActivityFeed from '@/components/workspace/ActivityFeed'
 import { AvatarStack } from '@/components/workspace/Avatar'
 import PendingDecisionsCard from '@/components/workspace/PendingDecisionsCard'
@@ -109,10 +106,23 @@ export default function WorkspacePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <Navbar user={user} onSignOut={handleSignOut} />
+    <div className="flex min-h-screen bg-slate-50">
+      <WorkspaceSidebar user={user} current="dashboard" onSignOut={handleSignOut} />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Slim top bar with just notifications + breadcrumb hint. */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="font-semibold text-slate-900">Dashboard</span>
+          </div>
+          <NotificationsBell />
+        </header>
+
+      <section className="mx-auto w-full max-w-6xl px-6 py-8">
         {/* ── Compact hero ───────────────────────────────────────────────── */}
         <div className="dv-anim-fade-up relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 px-7 py-6 text-white shadow-lg">
           <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand opacity-20 blur-3xl" />
@@ -250,54 +260,9 @@ export default function WorkspacePage() {
           Demo workspace · All data here is mock and resets on refresh.
         </p>
       </section>
+      </div>
 
       <QuickActionsFAB />
-    </main>
-  )
-}
-
-function Navbar({ user, onSignOut }: { user: UserRead; onSignOut: () => void }) {
-  return (
-    <header className="border-b border-slate-200 bg-white shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-6">
-          <Logo />
-          <nav className="flex items-center gap-1 text-sm">
-            <Link
-              href="/workspace"
-              aria-current="page"
-              className="rounded-md bg-slate-100 px-3 py-1.5 font-semibold text-slate-900"
-            >
-              Workspace
-            </Link>
-            <Link
-              href="/home"
-              className="rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              Parts
-            </Link>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              <Crown className="h-3.5 w-3.5" />
-              Admin
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-2">
-          <QuickSearchTrigger />
-          <NotificationsBell />
-          <UserBadge name={user.name} email={user.email} />
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    </header>
+    </div>
   )
 }

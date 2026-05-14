@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Search, Shield, Trash2 } from 'lucide-react'
 import Avatar from '@/components/workspace/Avatar'
+import TeamBadge from '@/components/workspace/TeamBadge'
 import {
   canChangeRoleTo,
   canRemove,
@@ -135,6 +136,7 @@ export default function MembersTab({
                               YOU
                             </span>
                           )}
+                          <TeamBadge team={m.team} size="xs" />
                         </div>
                         <p className="truncate text-xs text-slate-500">{m.email}</p>
                       </div>

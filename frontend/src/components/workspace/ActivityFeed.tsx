@@ -11,7 +11,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import Avatar from './Avatar'
-import { formatTimeAgo, type ActivityEntry, type ActivityKind } from '@/lib/mockWorkspace'
+import TeamBadge from './TeamBadge'
+import {
+  formatTimeAgo,
+  SEED_MEMBERS,
+  type ActivityEntry,
+  type ActivityKind,
+} from '@/lib/mockWorkspace'
 
 interface Props {
   entries: ActivityEntry[]
@@ -92,12 +98,18 @@ export default function ActivityFeed({ entries, limit }: Props) {
               <span className="font-semibold text-slate-900">{entry.target}</span>
             ) : null
 
+          const actorTeam = SEED_MEMBERS.find((m) => m.name === entry.actor_name)?.team
           return (
             <li key={entry.id} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50/60">
               <Avatar name={entry.actor_name} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">{entry.actor_name}</span>{' '}
+                  <span className="font-semibold text-slate-900">{entry.actor_name}</span>
+                  {actorTeam !== undefined && (
+                    <span className="ml-1.5 inline-block align-[1px]">
+                      <TeamBadge team={actorTeam} size="xs" />
+                    </span>
+                  )}{' '}
                   <span className="text-slate-500">{s.verb}</span>{' '}
                   {targetEl}
                 </p>

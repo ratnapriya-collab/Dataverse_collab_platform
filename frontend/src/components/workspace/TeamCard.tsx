@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Shield, Users } from 'lucide-react'
 import Avatar from './Avatar'
+import TeamBadge from './TeamBadge'
 import type { MockMember, WorkspaceRole } from '@/lib/mockWorkspace'
 
 const ROLE_STYLES: Record<WorkspaceRole, string> = {
@@ -46,7 +47,10 @@ export default function TeamCard({ members, onlineNames }: Props) {
                   </span>
                 )}
               </div>
-              <p className="truncate text-[11px] text-slate-500">{m.email}</p>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <TeamBadge team={m.team} size="xs" />
+                <p className="truncate text-[11px] text-slate-500">{m.email}</p>
+              </div>
             </div>
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${ROLE_STYLES[m.role]}`}

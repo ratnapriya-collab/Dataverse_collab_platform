@@ -84,3 +84,47 @@ body {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Entrance animations — applied to dashboards on mount. Keep durations short
+   (~400ms) so the page feels snappy, not laggy. Stagger via inline
+   animation-delay on each item.
+   ───────────────────────────────────────────────────────────────────────── */
+@keyframes dv-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dv-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Utility classes. Combine with inline `style={{ animationDelay: '...' }}`
+   on stagger items. `animation-fill-mode: both` makes the element stay at
+   the starting opacity (0) before the delay fires — no FOUC flash. */
+.dv-anim-fade-up {
+  animation: dv-fade-up 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dv-anim-fade-in {
+  animation: dv-fade-in 380ms ease-out both;
+}
+
+.dv-anim-pop {
+  animation: dv-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-anim-fade-up,
+  .dv-anim-fade-in,
+  .dv-anim-pop {
+    animation: none;
+  }
+}
+

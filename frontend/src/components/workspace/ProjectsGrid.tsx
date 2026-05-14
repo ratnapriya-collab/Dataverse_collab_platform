@@ -95,8 +95,12 @@ export default function ProjectsGrid({ projects }: Props) {
         </div>
       ) : (
         <ul className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => (
-            <li key={p.id}>
+          {filtered.map((p, idx) => (
+            <li
+              key={p.id}
+              className="dv-anim-fade-up"
+              style={{ animationDelay: `${idx * 70}ms` }}
+            >
               <ProjectCard project={p} />
             </li>
           ))}

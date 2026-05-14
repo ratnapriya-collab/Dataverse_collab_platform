@@ -113,7 +113,7 @@ export default function WorkspacePage() {
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         {/* ── Compact hero ───────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 px-7 py-6 text-white shadow-lg">
+        <div className="dv-anim-fade-up relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 px-7 py-6 text-white shadow-lg">
           <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand opacity-20 blur-3xl" />
           <div className="pointer-events-none absolute -left-12 -bottom-16 h-56 w-56 rounded-full bg-primary opacity-30 blur-3xl" />
           <div
@@ -179,47 +179,61 @@ export default function WorkspacePage() {
 
         {/* ── Stat tiles ─────────────────────────────────────────────────── */}
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={FolderKanban}
-            label="Active projects"
-            value={activeProjects}
-            hint={`${SEED_PROJECTS.length} total`}
-            accent="text-violet-600"
-            accentBg="bg-violet-50"
-          />
-          <StatCard
-            icon={MessageSquare}
-            label="Open comments"
-            value={openComments}
-            hint="awaiting decision"
-            accent="text-red-600"
-            accentBg="bg-red-50"
-          />
-          <StatCard
-            icon={Users}
-            label="Members"
-            value={members.length}
-            hint={`${adminCount} admin${adminCount === 1 ? '' : 's'}`}
-            accent="text-primary"
-            accentBg="bg-primary-50"
-          />
-          <StatCard
-            icon={MailPlus}
-            label="Pending invites"
-            value={pendingInvites}
-            hint={`${totalParts} total parts indexed`}
-            accent="text-brand-700"
-            accentBg="bg-brand-50"
-          />
+          <div className="dv-anim-fade-up" style={{ animationDelay: '80ms' }}>
+            <StatCard
+              icon={FolderKanban}
+              label="Active projects"
+              value={activeProjects}
+              hint={`${SEED_PROJECTS.length} total`}
+              accent="text-violet-600"
+              accentBg="bg-violet-50"
+            />
+          </div>
+          <div className="dv-anim-fade-up" style={{ animationDelay: '150ms' }}>
+            <StatCard
+              icon={MessageSquare}
+              label="Open comments"
+              value={openComments}
+              hint="awaiting decision"
+              accent="text-red-600"
+              accentBg="bg-red-50"
+            />
+          </div>
+          <div className="dv-anim-fade-up" style={{ animationDelay: '220ms' }}>
+            <StatCard
+              icon={Users}
+              label="Members"
+              value={members.length}
+              hint={`${adminCount} admin${adminCount === 1 ? '' : 's'}`}
+              accent="text-primary"
+              accentBg="bg-primary-50"
+            />
+          </div>
+          <div className="dv-anim-fade-up" style={{ animationDelay: '290ms' }}>
+            <StatCard
+              icon={MailPlus}
+              label="Pending invites"
+              value={pendingInvites}
+              hint={`${totalParts} total parts indexed`}
+              accent="text-brand-700"
+              accentBg="bg-brand-50"
+            />
+          </div>
         </div>
 
         {/* ── Projects grid (centerpiece) ────────────────────────────────── */}
-        <div className="mt-8">
+        <div
+          className="dv-anim-fade-up mt-8"
+          style={{ animationDelay: '380ms' }}
+        >
           <ProjectsGrid projects={SEED_PROJECTS} />
         </div>
 
         {/* ── Supporting cards: activity / pending / team ────────────────── */}
-        <div className="mt-10 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <div
+          className="dv-anim-fade-up mt-10 grid gap-6 lg:grid-cols-[1.4fr_1fr]"
+          style={{ animationDelay: '480ms' }}
+        >
           <ActivityFeed entries={SEED_ACTIVITY} limit={6} />
           <div className="space-y-4">
             <PendingDecisionsCard decisions={SEED_PENDING_DECISIONS} />

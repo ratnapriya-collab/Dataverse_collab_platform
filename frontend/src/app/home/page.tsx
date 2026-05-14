@@ -4,11 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { Building2, Shield } from 'lucide-react'
-import Logo from '@/components/ui/Logo'
 import UploadDropzone from '@/components/ui/UploadDropzone'
-import UserBadge from '@/components/ui/UserBadge'
 import NotificationsBell from '@/components/layout/NotificationsBell'
-import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
+import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_WORKSPACE } from '@/lib/mockWorkspace'
@@ -82,49 +80,22 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6">
-            <Logo />
-            <nav className="flex items-center gap-1 text-sm">
-              <Link
-                href="/workspace"
-                className="rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Workspace
-              </Link>
-              <Link
-                href="/home"
-                aria-current="page"
-                className="rounded-md bg-slate-100 px-3 py-1.5 font-semibold text-slate-900"
-              >
-                Parts
-              </Link>
-              <Link
-                href="/admin"
-                className="rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Admin
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <QuickSearchTrigger />
-            <NotificationsBell />
-            <UserBadge name={user.name} email={user.email} />
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-slate-50">
+      <WorkspaceSidebar user={user} current="files" onSignOut={handleSignOut} />
 
-      <section className="mx-auto max-w-5xl px-6 py-8">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="font-semibold text-slate-900">Parts</span>
+          </div>
+          <NotificationsBell />
+        </header>
+
+      <section className="mx-auto w-full max-w-5xl px-6 py-8">
         {/* Workspace pill — links to /admin */}
         <Link
           href="/admin"
@@ -200,6 +171,7 @@ export default function HomePage() {
           )}
         </div>
       </section>
-    </main>
+      </div>
+    </div>
   )
 }

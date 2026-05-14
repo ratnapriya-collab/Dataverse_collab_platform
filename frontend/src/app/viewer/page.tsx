@@ -110,7 +110,7 @@ export default function ViewerDemoPage() {
           <ViewerCanvas onFacePick={handleFacePick} />
         </div>
 
-        <aside className="overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
+        <aside className="dv-thin-scroll overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
           <h2 className="text-sm font-semibold text-slate-900">Welcome, {user.name}.</h2>
           <p className="mt-1 text-xs text-slate-500">
             Click any face on the 3D model to pick it. A stable topology-hash UUID is

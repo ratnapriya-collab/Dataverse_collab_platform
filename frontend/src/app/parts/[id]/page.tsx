@@ -241,7 +241,7 @@ export default function PartPage() {
           />
         </div>
 
-        <aside className="overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
+        <aside className="dv-thin-scroll overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
           <h2 className="text-sm font-semibold text-slate-900">Part</h2>
           <dl className="mt-3 space-y-1 text-xs">
             <KV label="Name" value={part.name} />

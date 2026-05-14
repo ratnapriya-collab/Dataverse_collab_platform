@@ -146,11 +146,14 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
   ]
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[268px] shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="sticky top-0 flex h-screen w-[268px] shrink-0 flex-col border-r border-slate-200 bg-gradient-to-b from-white via-white to-slate-50/80 shadow-[1px_0_0_0_rgba(15,23,42,0.04)]">
       {/* ── Brand ──────────────────────────────────────────────────────── */}
-      <div className="border-b border-slate-200 px-4 py-3.5">
-        <Link href="/workspace" className="flex items-center gap-2.5 select-none">
-          <HexMark className="h-8 w-8 text-brand" />
+      <div className="border-b border-slate-200/80 px-4 py-3.5">
+        <Link
+          href="/workspace"
+          className="group flex items-center gap-2.5 select-none transition"
+        >
+          <HexMark className="h-8 w-8 text-brand transition-transform duration-300 group-hover:rotate-[18deg]" />
           <div className="flex flex-col leading-none">
             <span className="text-sm font-black tracking-tight text-slate-900">
               DATAVERS<span className="text-brand">.AI</span>
@@ -163,7 +166,7 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       </div>
 
       {/* ── Workspace switcher + Cmd+K ────────────────────────────────── */}
-      <div className="space-y-2 border-b border-slate-200 p-3">
+      <div className="space-y-2 border-b border-slate-200/80 p-3">
         <button
           type="button"
           className="group flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left transition hover:border-slate-300 hover:bg-slate-100"
@@ -191,10 +194,13 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       </div>
 
       {/* ── Nav groups + pinned ────────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto py-3">
-        {groups.map((group) => (
-          <div key={group.title} className="px-3 pb-4">
-            <p className="px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+      <nav className="dv-thin-scroll-hover flex-1 overflow-y-auto py-3">
+        {groups.map((group, groupIdx) => (
+          <div key={group.title} className="px-3 pb-3">
+            {groupIdx > 0 && (
+              <div className="mx-2 mb-3 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+            )}
+            <p className="px-2 pb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -207,34 +213,35 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
                       href={item.href}
                       aria-current={active ? 'page' : undefined}
                       className={[
-                        'group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition duration-150',
+                        'group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all duration-200',
                         active
-                          ? 'bg-primary-50 font-semibold text-primary-700'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                          ? 'bg-gradient-to-r from-primary-50 via-primary-50 to-brand-50/60 font-semibold text-primary-700 shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900',
                       ].join(' ')}
                     >
                       {active && (
                         <span
                           aria-hidden="true"
-                          className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-r bg-primary"
+                          className="absolute -left-3 bottom-1 top-1 w-1 rounded-r-full bg-gradient-to-b from-primary to-brand"
                         />
                       )}
                       <Icon
                         className={[
-                          'h-4 w-4 shrink-0 transition-transform group-hover:scale-110',
+                          'h-4 w-4 shrink-0 transition-all duration-200',
                           active
-                            ? 'text-primary'
-                            : item.iconAccent ?? 'text-slate-400 group-hover:text-slate-600',
+                            ? 'scale-110 text-primary'
+                            : item.iconAccent ??
+                              'text-slate-400 group-hover:scale-110 group-hover:text-slate-700',
                         ].join(' ')}
                       />
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
                         <span
                           className={[
-                            'rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums',
+                            'rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums shadow-sm',
                             active
                               ? 'bg-primary text-white'
-                              : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200',
+                              : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-slate-800',
                           ].join(' ')}
                         >
                           {item.badge}
@@ -250,11 +257,12 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
 
         {/* Pinned projects */}
         <div className="px-3 pb-4">
+          <div className="mx-2 mb-3 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
           <div className="flex items-center justify-between px-2 pb-1.5">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
               Pinned
             </p>
-            <Star className="h-2.5 w-2.5 text-slate-300" />
+            <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
           </div>
           <ul className="space-y-0.5">
             {pinned.map((p) => (
@@ -262,16 +270,16 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
                 <Link
                   href={`/projects/${p.id}`}
                   title={p.name}
-                  className="group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition hover:bg-slate-50"
+                  className="group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-all duration-200 hover:translate-x-0.5 hover:bg-slate-100/70"
                 >
                   <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ring-2 ring-white ${STATUS_DOT[p.status]}`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ring-2 ring-white shadow-sm ${STATUS_DOT[p.status]}`}
                   />
                   <span className="flex-1 truncate text-slate-600 group-hover:text-slate-900">
                     {p.name}
                   </span>
                   {p.open_comments > 0 && (
-                    <span className="text-[9px] font-bold text-red-600">
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
                       {p.open_comments}
                     </span>
                   )}
@@ -283,7 +291,10 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       </nav>
 
       {/* ── User card at bottom ────────────────────────────────────────── */}
-      <div ref={userMenuRef} className="relative border-t border-slate-200 p-3">
+      <div
+        ref={userMenuRef}
+        className="relative border-t border-slate-200/80 bg-gradient-to-b from-transparent to-slate-50/60 p-3"
+      >
         <button
           type="button"
           onClick={() => setUserMenuOpen((o) => !o)}

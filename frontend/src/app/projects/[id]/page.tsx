@@ -205,7 +205,7 @@ export default function ProjectPage() {
           <ViewerCanvas />
         </div>
 
-        <aside className="overflow-y-auto border-l border-slate-200 bg-white">
+        <aside className="dv-thin-scroll overflow-y-auto border-l border-slate-200 bg-white">
           {/* Hero card with thumbnail */}
           <div className="relative">
             <ProjectThumbnail shape={project.shape} tone={project.tone} aspectClass="aspect-[16/9]" />

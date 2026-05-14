@@ -109,7 +109,7 @@ export default function NotificationsBell() {
             )}
           </header>
 
-          <ul className="max-h-[420px] divide-y divide-slate-100 overflow-y-auto">
+          <ul className="dv-thin-scroll max-h-[420px] divide-y divide-slate-100 overflow-y-auto">
             {items.map((n) => {
               const s = KIND_STYLE[n.kind]
               const Icon = s.icon

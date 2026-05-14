@@ -201,7 +201,7 @@ export default function CommandPalette() {
           </kbd>
         </div>
 
-        <ul className="max-h-[420px] overflow-y-auto py-1">
+        <ul className="dv-thin-scroll max-h-[420px] overflow-y-auto py-1">
           {filtered.length === 0 ? (
             <li className="px-4 py-10 text-center text-sm text-slate-500">
               No results for &ldquo;{query}&rdquo;

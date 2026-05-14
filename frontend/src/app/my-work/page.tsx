@@ -17,10 +17,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ArrowDownNarrowWide,
   ArrowRight,
+  ArrowUpNarrowWide,
   AtSign,
   Bell,
   Calendar,
+  Check,
   CheckCircle2,
   Clock,
   Eye,
@@ -28,6 +31,8 @@ import {
   Inbox,
   MessageCircle,
   MessageSquare,
+  Search,
+  SlidersHorizontal,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -40,7 +45,10 @@ import { clearToken } from '@/lib/auth'
 import {
   formatTimeAgo,
   SEED_WORK_ITEMS,
+  TEAM_META,
+  TEAM_ORDER,
   type AttachmentType,
+  type EngineeringTeam,
   type MockWorkItem,
   type WorkItemKind,
   type WorkItemPriority,
@@ -80,11 +88,33 @@ const TABS: TabDef[] = [
   },
 ]
 
+type SortMode = 'priority' | 'newest' | 'oldest' | 'due_first'
+
+const SORT_LABEL: Record<SortMode, string> = {
+  priority: 'Priority',
+  newest: 'Newest first',
+  oldest: 'Oldest first',
+  due_first: 'Due soonest',
+}
+
+const PRIORITY_WEIGHT: Record<WorkItemPriority, number> = {
+  CRITICAL: 5,
+  HIGH: 4,
+  MEDIUM: 3,
+  RESPONDED: 2,
+  INFO: 1,
+}
+
 export default function MyWorkPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<WorkItemTab>('assigned')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<SortMode>('priority')
+  const [sortOpen, setSortOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [teamFilter, setTeamFilter] = useState<Set<EngineeringTeam>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -113,10 +143,55 @@ export default function MyWorkPage() {
     return c
   }, [])
 
-  const visible = useMemo(
-    () => SEED_WORK_ITEMS.filter((i) => i.tab === activeTab),
-    [activeTab],
-  )
+  const visible = useMemo(() => {
+    let list = SEED_WORK_ITEMS.filter((i) => i.tab === activeTab)
+    const q = query.trim().toLowerCase()
+    if (q.length > 0) {
+      list = list.filter(
+        (i) =>
+          i.title.toLowerCase().includes(q) ||
+          i.project_name.toLowerCase().includes(q) ||
+          (i.snippet?.toLowerCase().includes(q) ?? false) ||
+          i.requester_name.toLowerCase().includes(q) ||
+          (i.attachment?.name.toLowerCase().includes(q) ?? false),
+      )
+    }
+    if (teamFilter.size > 0) {
+      list = list.filter((i) => teamFilter.has(i.requester_team))
+    }
+    const sorted = [...list]
+    if (sort === 'priority') {
+      sorted.sort(
+        (a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority],
+      )
+    } else if (sort === 'newest') {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+    } else if (sort === 'oldest') {
+      sorted.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      )
+    } else if (sort === 'due_first') {
+      sorted.sort((a, b) => {
+        const aDue = a.due_at !== undefined ? new Date(a.due_at).getTime() : Infinity
+        const bDue = b.due_at !== undefined ? new Date(b.due_at).getTime() : Infinity
+        return aDue - bDue
+      })
+    }
+    return sorted
+  }, [activeTab, query, sort, teamFilter])
+
+  function toggleTeam(team: EngineeringTeam): void {
+    setTeamFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(team)) next.delete(team)
+      else next.add(team)
+      return next
+    })
+  }
 
   function handleSignOut(): void {
     clearToken()
@@ -205,6 +280,130 @@ export default function MyWorkPage() {
           <p className="mt-3 text-xs text-slate-500">
             {TABS.find((t) => t.id === activeTab)?.blurb}
           </p>
+
+          {/* Search / Sort / Filter control row */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search title, project, requester, file…"
+                className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* Sort dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setSortOpen((o) => !o)
+                  setFilterOpen(false)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-400"
+              >
+                {sort === 'oldest' ? (
+                  <ArrowUpNarrowWide className="h-3.5 w-3.5 text-slate-500" />
+                ) : (
+                  <ArrowDownNarrowWide className="h-3.5 w-3.5 text-slate-500" />
+                )}
+                {SORT_LABEL[sort]}
+              </button>
+              {sortOpen && (
+                <div
+                  className="dv-anim-pop absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+                  onMouseLeave={() => setSortOpen(false)}
+                >
+                  {(Object.keys(SORT_LABEL) as SortMode[]).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        setSort(opt)
+                        setSortOpen(false)
+                      }}
+                      className={[
+                        'flex w-full items-center justify-between px-3 py-2 text-xs transition hover:bg-slate-50',
+                        opt === sort ? 'font-semibold text-primary' : 'text-slate-700',
+                      ].join(' ')}
+                    >
+                      {SORT_LABEL[opt]}
+                      {opt === sort && <Check className="h-3 w-3 text-primary" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Filter button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterOpen((o) => !o)
+                  setSortOpen(false)
+                }}
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition',
+                  teamFilter.size > 0
+                    ? 'border-primary bg-primary-50 text-primary-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
+                ].join(' ')}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filter
+                {teamFilter.size > 0 && (
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    {teamFilter.size}
+                  </span>
+                )}
+              </button>
+              {filterOpen && (
+                <div
+                  className="dv-anim-pop absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+                  onMouseLeave={() => setFilterOpen(false)}
+                >
+                  <p className="border-b border-slate-100 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Filter by team
+                  </p>
+                  {TEAM_ORDER.map((team) => {
+                    const meta = TEAM_META[team]
+                    const checked = teamFilter.has(team)
+                    return (
+                      <button
+                        key={team}
+                        type="button"
+                        onClick={() => toggleTeam(team)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-xs transition hover:bg-slate-50"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: meta.hex }}
+                          />
+                          <span className={checked ? 'font-semibold text-slate-900' : 'text-slate-700'}>
+                            {meta.label}
+                          </span>
+                        </span>
+                        {checked && <Check className="h-3 w-3 text-primary" />}
+                      </button>
+                    )
+                  })}
+                  {teamFilter.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setTeamFilter(new Set())}
+                      className="block w-full border-t border-slate-100 px-3 py-2 text-left text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Items */}
           {visible.length === 0 ? (

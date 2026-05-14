@@ -9,7 +9,12 @@
  *   • PENDING      — slate outline, muted text
  *   • BLOCKED      — red ring with ⚠ overlay
  *
- * Thin connecting line between stages, colour-graded by completion.
+ * Connector lines between stages encode flow:
+ *   • completed flow (DONE→DONE or DONE→IN_PROGRESS) — solid emerald, fully filled
+ *   • leaving an IN_PROGRESS stage — gradient from team color → slate (work
+ *     is moving but hasn't reached the next station yet)
+ *   • any segment touching BLOCKED — red-200
+ *   • unstarted (PENDING→PENDING) — slate
  */
 
 import { AlertTriangle, Check, Clock } from 'lucide-react'
@@ -41,7 +46,7 @@ export default function PipelineStrip({ pipeline, compact = false }: Props) {
         const stage = pipeline[team]
         const isLast = idx === TEAM_ORDER.length - 1
         const nextStage = !isLast ? pipeline[TEAM_ORDER[idx + 1] as EngineeringTeam] : null
-        const connectorColor = pickConnectorColor(stage, nextStage)
+        const leftHex = TEAM_META[team].hex
         return (
           <div key={team} className="flex flex-1 items-center">
             <Stage
@@ -51,12 +56,8 @@ export default function PipelineStrip({ pipeline, compact = false }: Props) {
               labelSize={labelSize}
               compact={compact}
             />
-            {!isLast && (
-              <span
-                className="mx-0.5 h-0.5 flex-1 rounded-full"
-                style={{ backgroundColor: connectorColor }}
-                aria-hidden="true"
-              />
+            {!isLast && nextStage !== null && (
+              <Connector left={stage} right={nextStage} leftHex={leftHex} />
             )}
           </div>
         )
@@ -146,14 +147,58 @@ function DotForStage({
   )
 }
 
-/** Pick a connector colour based on the two stages flanking it. */
-function pickConnectorColor(left: PipelineStage, right: PipelineStage | null): string {
-  if (right === null) return '#cbd5e1'
+/**
+ * Connector between two stages. Encodes flow visually:
+ *  - DONE → DONE / IN_PROGRESS  : solid emerald, fully filled bar
+ *  - IN_PROGRESS → anything     : team-color → slate gradient (work in flight)
+ *  - anything ↔ BLOCKED         : red-200
+ *  - PENDING → PENDING          : slate, dim
+ */
+function Connector({
+  left,
+  right,
+  leftHex,
+}: {
+  left: PipelineStage
+  right: PipelineStage
+  leftHex: string
+}) {
+  const base = 'mx-1 h-1 flex-1 rounded-full'
+
   if (left === 'DONE' && (right === 'DONE' || right === 'IN_PROGRESS')) {
-    return '#10b981' // emerald — flow forward
+    return (
+      <span
+        className={base}
+        style={{ backgroundColor: '#10b981' }}
+        aria-hidden="true"
+      />
+    )
+  }
+  if (left === 'IN_PROGRESS') {
+    return (
+      <span
+        className={base}
+        style={{
+          background: `linear-gradient(to right, ${leftHex} 0%, ${leftHex}99 35%, #e2e8f0 100%)`,
+        }}
+        aria-hidden="true"
+      />
+    )
   }
   if (left === 'BLOCKED' || right === 'BLOCKED') {
-    return '#fecaca' // red-200
+    return (
+      <span
+        className={base}
+        style={{ backgroundColor: '#fca5a5' }}
+        aria-hidden="true"
+      />
+    )
   }
-  return '#cbd5e1' // slate-300
+  return (
+    <span
+      className={base}
+      style={{ backgroundColor: '#e2e8f0' }}
+      aria-hidden="true"
+    />
+  )
 }

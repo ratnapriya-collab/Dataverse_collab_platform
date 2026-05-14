@@ -4,15 +4,15 @@
  *
  * Each team gets a small chip with the 3-letter abbreviation and a state
  * indicator drawn around it:
- *   • DONE         — solid team-color fill
- *   • IN_PROGRESS  — coloured ring, pulsing animation
+ *   • DONE         — solid team-color fill with check
+ *   • IN_PROGRESS  — coloured ring with a static clock glyph
  *   • PENDING      — slate outline, muted text
  *   • BLOCKED      — red ring with ⚠ overlay
  *
  * Thin connecting line between stages, colour-graded by completion.
  */
 
-import { AlertTriangle, Check, Loader } from 'lucide-react'
+import { AlertTriangle, Check, Clock } from 'lucide-react'
 import {
   TEAM_META,
   TEAM_ORDER,
@@ -118,14 +118,10 @@ function DotForStage({
   if (stage === 'IN_PROGRESS') {
     return (
       <div
-        className={`relative flex ${dotSize} items-center justify-center rounded-full ring-2 ring-white`}
-        style={{ backgroundColor: `${hex}1A`, borderColor: hex }}
+        className={`flex ${dotSize} items-center justify-center rounded-full ring-2 ring-white`}
+        style={{ backgroundColor: `${hex}1A`, boxShadow: `inset 0 0 0 1.5px ${hex}` }}
       >
-        <div
-          className="absolute inset-0 animate-pulse rounded-full opacity-30"
-          style={{ backgroundColor: hex }}
-        />
-        <Loader className="relative h-3 w-3 animate-spin" style={{ color: hex }} />
+        <Clock className="h-3 w-3" style={{ color: hex }} strokeWidth={2.5} />
       </div>
     )
   }

@@ -16,6 +16,7 @@ import {
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import NotificationsBell from '@/components/layout/NotificationsBell'
+import QuickActionsFAB from '@/components/layout/QuickActionsFAB'
 import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
 import ActivityFeed from '@/components/workspace/ActivityFeed'
 import { AvatarStack } from '@/components/workspace/Avatar'
@@ -187,6 +188,7 @@ export default function WorkspacePage() {
               hint={`${SEED_PROJECTS.length} total`}
               accent="text-violet-600"
               accentBg="bg-violet-50"
+              trend={[2, 3, 3, 2, 4, 3, 4]}
             />
           </div>
           <div className="dv-anim-fade-up" style={{ animationDelay: '150ms' }}>
@@ -197,6 +199,7 @@ export default function WorkspacePage() {
               hint="awaiting decision"
               accent="text-red-600"
               accentBg="bg-red-50"
+              trend={[5, 4, 6, 8, 7, 9, 10]}
             />
           </div>
           <div className="dv-anim-fade-up" style={{ animationDelay: '220ms' }}>
@@ -207,6 +210,7 @@ export default function WorkspacePage() {
               hint={`${adminCount} admin${adminCount === 1 ? '' : 's'}`}
               accent="text-primary"
               accentBg="bg-primary-50"
+              trend={[3, 3, 4, 4, 4, 5, 5]}
             />
           </div>
           <div className="dv-anim-fade-up" style={{ animationDelay: '290ms' }}>
@@ -217,6 +221,7 @@ export default function WorkspacePage() {
               hint={`${totalParts} total parts indexed`}
               accent="text-brand-700"
               accentBg="bg-brand-50"
+              trend={[0, 1, 2, 1, 2, 1, 1]}
             />
           </div>
         </div>
@@ -245,6 +250,8 @@ export default function WorkspacePage() {
           Demo workspace · All data here is mock and resets on refresh.
         </p>
       </section>
+
+      <QuickActionsFAB />
     </main>
   )
 }

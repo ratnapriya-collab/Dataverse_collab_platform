@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import AnimatedNumber from './AnimatedNumber'
+import Sparkline from './Sparkline'
 
 interface Props {
   icon: LucideIcon
@@ -13,6 +14,8 @@ interface Props {
   accentBg?: string
   /** Count from 0 up to value on mount. Auto-enabled for numeric values. */
   animate?: boolean
+  /** 7-day trend data for the sparkline. Omit to hide the chart. */
+  trend?: number[]
 }
 
 export default function StatCard({
@@ -23,6 +26,7 @@ export default function StatCard({
   accent = 'text-primary',
   accentBg = 'bg-primary-50',
   animate = true,
+  trend,
 }: Props) {
   const isNumeric = typeof value === 'number'
   return (
@@ -37,14 +41,21 @@ export default function StatCard({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             {label}
           </p>
-          <p className="mt-0.5 text-2xl font-bold tabular-nums text-slate-900">
-            {isNumeric && animate ? (
-              <AnimatedNumber value={value as number} durationMs={900} />
-            ) : (
-              value
+          <div className="mt-0.5 flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold tabular-nums leading-none text-slate-900">
+              {isNumeric && animate ? (
+                <AnimatedNumber value={value as number} durationMs={900} />
+              ) : (
+                value
+              )}
+            </p>
+            {trend !== undefined && trend.length >= 2 && (
+              <div className={`shrink-0 ${accent}`}>
+                <Sparkline data={trend} width={70} height={22} />
+              </div>
             )}
-          </p>
-          {hint !== undefined && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+          </div>
+          {hint !== undefined && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
         </div>
       </div>
     </div>

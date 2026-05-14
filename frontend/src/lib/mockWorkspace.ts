@@ -658,13 +658,23 @@ export type WorkItemKind =
 
 export type WorkItemTab = 'assigned' | 'owned' | 'following'
 
+export type WorkItemPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'INFO' | 'RESPONDED'
+
+export type AttachmentType = 'step' | 'stp' | 'glb' | 'gltf' | 'pdf' | 'stl' | 'iges'
+
+export interface WorkItemAttachment {
+  name: string
+  type: AttachmentType
+  version: string // e.g. "V3"
+}
+
 export interface MockWorkItem {
   id: string
   kind: WorkItemKind
   tab: WorkItemTab
   project_id: string
   project_name: string
-  /** One-line title, e.g. "Wall thickness on inlet flange". */
+  /** One-line title. */
   title: string
   /** Optional snippet (rationale, comment text). */
   snippet?: string
@@ -673,13 +683,21 @@ export interface MockWorkItem {
   requester_team: EngineeringTeam
   /** Status — done is hidden by default; UI filters on this. */
   status: 'OPEN' | 'RESPONDED' | 'DONE'
+  /** Drives the left-edge colour bar on each card. */
+  priority: WorkItemPriority
   created_at: string // ISO
   /** Optional due date for time-pressure. */
   due_at?: string
+  /** Optional file the item is anchored to. */
+  attachment?: WorkItemAttachment
+  /** How many of the assigned reviewers have responded so far. */
+  reviewer_progress?: { responded: number; total: number }
+  /** Comment count for the chat-bubble chip. */
+  comment_count?: number
 }
 
 export const SEED_WORK_ITEMS: MockWorkItem[] = [
-  // ── Assigned to me — Sarah Chen (CAE) flagged stress on Turbo Housing ──
+  // ── Assigned to me ────────────────────────────────────────────────────────
   {
     id: 'w1',
     kind: 'REVIEW_ASSIGNED',
@@ -692,8 +710,12 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'Sarah Chen',
     requester_team: 'CAE',
     status: 'OPEN',
+    priority: 'CRITICAL',
     created_at: new Date(NOW - 35 * 60_000).toISOString(),
-    due_at: new Date(NOW + 18 * 3_600_000).toISOString(),
+    due_at: new Date(NOW + 11 * 3_600_000).toISOString(),
+    attachment: { name: 'turbo_housing_v3.step', type: 'step', version: 'V3' },
+    reviewer_progress: { responded: 4, total: 6 },
+    comment_count: 8,
   },
   {
     id: 'w2',
@@ -707,7 +729,12 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'John Williams',
     requester_team: 'SUPPLIER',
     status: 'OPEN',
+    priority: 'HIGH',
     created_at: new Date(NOW - 4 * 3_600_000).toISOString(),
+    due_at: new Date(NOW + 22 * 3_600_000).toISOString(),
+    attachment: { name: 'intake_manifold_v2.iges', type: 'iges', version: 'V2' },
+    reviewer_progress: { responded: 2, total: 5 },
+    comment_count: 11,
   },
   {
     id: 'w3',
@@ -721,11 +748,15 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'Maria Garcia',
     requester_team: 'REVIEWER',
     status: 'OPEN',
+    priority: 'MEDIUM',
     created_at: new Date(NOW - 1 * DAYS).toISOString(),
     due_at: new Date(NOW + 2 * DAYS).toISOString(),
+    attachment: { name: 'ecu_bracket_d2.glb', type: 'glb', version: 'V2' },
+    reviewer_progress: { responded: 1, total: 4 },
+    comment_count: 3,
   },
 
-  // ── Owned by me — decisions/comments you authored, still open ──
+  // ── Owned by me ───────────────────────────────────────────────────────────
   {
     id: 'w4',
     kind: 'DECISION_OWNED',
@@ -738,7 +769,11 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'You',
     requester_team: 'DESIGN',
     status: 'OPEN',
+    priority: 'MEDIUM',
     created_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+    attachment: { name: 'sun_gear_v1.step', type: 'step', version: 'V1' },
+    reviewer_progress: { responded: 1, total: 3 },
+    comment_count: 4,
   },
   {
     id: 'w5',
@@ -752,10 +787,14 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'You',
     requester_team: 'DESIGN',
     status: 'RESPONDED',
+    priority: 'RESPONDED',
     created_at: new Date(NOW - 1 * DAYS).toISOString(),
+    attachment: { name: 'material_change.pdf', type: 'pdf', version: 'V1' },
+    reviewer_progress: { responded: 5, total: 6 },
+    comment_count: 14,
   },
 
-  // ── Following — projects you watch but aren't actively driving ──
+  // ── Following ─────────────────────────────────────────────────────────────
   {
     id: 'w6',
     kind: 'MENTION',
@@ -768,7 +807,10 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'Sarah Chen',
     requester_team: 'CAE',
     status: 'OPEN',
+    priority: 'INFO',
     created_at: new Date(NOW - 6 * 3_600_000).toISOString(),
+    attachment: { name: 'cfd_report_v2.pdf', type: 'pdf', version: 'V2' },
+    comment_count: 2,
   },
   {
     id: 'w7',
@@ -782,7 +824,10 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'David Kim',
     requester_team: 'MANUFACTURING',
     status: 'OPEN',
+    priority: 'INFO',
     created_at: new Date(NOW - 9 * 3_600_000).toISOString(),
+    attachment: { name: 'vibration_test_v1.pdf', type: 'pdf', version: 'V1' },
+    comment_count: 5,
   },
   {
     id: 'w8',
@@ -796,7 +841,10 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'Maria Garcia',
     requester_team: 'REVIEWER',
     status: 'OPEN',
+    priority: 'INFO',
     created_at: new Date(NOW - 1 * DAYS).toISOString(),
+    attachment: { name: 'gear_set_assembly.stl', type: 'stl', version: 'V4' },
+    comment_count: 1,
   },
   {
     id: 'w9',
@@ -810,7 +858,10 @@ export const SEED_WORK_ITEMS: MockWorkItem[] = [
     requester_name: 'Sarah Chen',
     requester_team: 'CAE',
     status: 'OPEN',
+    priority: 'INFO',
     created_at: new Date(NOW - 2 * DAYS).toISOString(),
+    attachment: { name: 'topology_opt_v2.step', type: 'step', version: 'V2' },
+    comment_count: 0,
   },
 ]
 

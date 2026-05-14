@@ -20,11 +20,15 @@ import {
   ArrowRight,
   AtSign,
   Bell,
+  Calendar,
   CheckCircle2,
   Clock,
   Eye,
+  FileText,
   Inbox,
+  MessageCircle,
   MessageSquare,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
@@ -36,8 +40,10 @@ import { clearToken } from '@/lib/auth'
 import {
   formatTimeAgo,
   SEED_WORK_ITEMS,
+  type AttachmentType,
   type MockWorkItem,
   type WorkItemKind,
+  type WorkItemPriority,
   type WorkItemTab,
 } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
@@ -226,72 +232,151 @@ export default function MyWorkPage() {
   )
 }
 
+const PRIORITY_BAR: Record<WorkItemPriority, string> = {
+  CRITICAL: 'bg-red-500',
+  HIGH: 'bg-orange-500',
+  MEDIUM: 'bg-amber-400',
+  INFO: 'bg-slate-300',
+  RESPONDED: 'bg-emerald-500',
+}
+
+const ATTACHMENT_META: Record<AttachmentType, { label: string; tint: string }> = {
+  step: { label: 'STEP', tint: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  stp: { label: 'STP', tint: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  glb: { label: 'GLB', tint: 'bg-violet-50 text-violet-700 border-violet-200' },
+  gltf: { label: 'GLTF', tint: 'bg-violet-50 text-violet-700 border-violet-200' },
+  pdf: { label: 'PDF', tint: 'bg-rose-50 text-rose-700 border-rose-200' },
+  stl: { label: 'STL', tint: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  iges: { label: 'IGES', tint: 'bg-amber-50 text-amber-700 border-amber-200' },
+}
+
+function formatDateChip(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 function WorkItemCard({ item }: { item: MockWorkItem }) {
   const meta = KIND_META[item.kind]
   const Icon = meta.icon
-  const dueSoon =
-    item.due_at !== undefined && new Date(item.due_at).getTime() - Date.now() < 24 * 3_600_000
+  const dueMs =
+    item.due_at !== undefined ? new Date(item.due_at).getTime() - Date.now() : null
+  const dueSoon = dueMs !== null && dueMs < 24 * 3_600_000
+  const attach = item.attachment
 
   return (
     <Link
       href={`/projects/${item.project_id}`}
-      className="group flex gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+      className="group flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      <Avatar name={item.requester_name} size="md" />
+      {/* Left priority bar — instant scan colour for the item's urgency */}
+      <div
+        className={`w-1 shrink-0 ${PRIORITY_BAR[item.priority]}`}
+        aria-hidden="true"
+      />
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${meta.tint}`}
-              >
-                <Icon className="h-2.5 w-2.5" />
-                {meta.label}
+      <div className="flex flex-1 gap-4 p-4">
+        <Avatar name={item.requester_name} size="md" />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${meta.tint}`}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  {meta.label}
+                </span>
+                <Link
+                  href={`/projects/${item.project_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="truncate text-[11px] font-semibold text-slate-500 hover:text-primary hover:underline"
+                >
+                  {item.project_name}
+                </Link>
+                {item.status === 'RESPONDED' && (
+                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
+                    Awaiting them
+                  </span>
+                )}
+              </div>
+              <h3 className="mt-1 text-sm font-semibold text-slate-900 group-hover:text-primary">
+                {item.title}
+              </h3>
+              {item.snippet !== undefined && (
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">
+                  {item.snippet}
+                </p>
+              )}
+
+              {/* File attachment chip */}
+              {attach !== undefined && (
+                <div className="mt-2.5 inline-flex items-center gap-1.5">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${ATTACHMENT_META[attach.type].tint}`}
+                  >
+                    <FileText className="h-3 w-3" />
+                    {ATTACHMENT_META[attach.type].label}
+                  </span>
+                  <span className="truncate font-mono text-[10px] text-slate-600">
+                    {attach.name}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                    {attach.version}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Right column — date + relative time + reviewer progress */}
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                <Calendar className="h-2.5 w-2.5" />
+                {formatDateChip(item.created_at)}
               </span>
-              <Link
-                href={`/projects/${item.project_id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="truncate text-[11px] font-semibold text-slate-500 hover:text-primary hover:underline"
-              >
-                {item.project_name}
-              </Link>
-              {item.status === 'RESPONDED' && (
-                <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
-                  Awaiting them
+              {item.due_at !== undefined && (
+                <span
+                  className={[
+                    'inline-flex items-center gap-1 text-[10px]',
+                    dueSoon ? 'font-bold text-red-600' : 'text-slate-500',
+                  ].join(' ')}
+                >
+                  <Clock className="h-2.5 w-2.5" />
+                  {dueSoon
+                    ? 'Due soon'
+                    : `Due ${formatTimeAgo(item.due_at).replace('ago', 'from now')}`}
                 </span>
               )}
             </div>
-            <h3 className="mt-1 text-sm font-semibold text-slate-900 group-hover:text-primary">
-              {item.title}
-            </h3>
-            {item.snippet !== undefined && (
-              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">
-                {item.snippet}
-              </p>
-            )}
           </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-        </div>
 
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">{item.requester_name}</span>
-            <TeamBadge team={item.requester_team} size="xs" />
-          </div>
-          <div className="flex items-center gap-3">
-            {item.due_at !== undefined && (
-              <span
-                className={[
-                  'inline-flex items-center gap-1',
-                  dueSoon ? 'font-semibold text-red-600' : 'text-slate-500',
-                ].join(' ')}
-              >
-                <Clock className="h-3 w-3" />
-                {dueSoon ? 'Due soon' : `Due ${formatTimeAgo(item.due_at).replace('ago', 'from now')}`}
-              </span>
-            )}
-            <span>{formatTimeAgo(item.created_at)}</span>
+          {/* Bottom row — requester + reviewer progress + comments + arrow */}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">{item.requester_name}</span>
+              <TeamBadge team={item.requester_team} size="xs" />
+            </div>
+            <div className="flex items-center gap-3">
+              {item.reviewer_progress !== undefined && (
+                <span
+                  title={`${item.reviewer_progress.responded} of ${item.reviewer_progress.total} reviewers responded`}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600"
+                >
+                  <Users className="h-3 w-3 text-slate-400" />
+                  {item.reviewer_progress.responded}/{item.reviewer_progress.total}
+                </span>
+              )}
+              {item.comment_count !== undefined && item.comment_count > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600">
+                  <MessageCircle className="h-3 w-3 text-slate-400" />
+                  {item.comment_count}
+                </span>
+              )}
+              <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+            </div>
           </div>
         </div>
       </div>

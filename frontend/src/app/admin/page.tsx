@@ -16,11 +16,9 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import Logo from '@/components/ui/Logo'
-import UserBadge from '@/components/ui/UserBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
 import NotificationsBell from '@/components/layout/NotificationsBell'
-import { QuickSearchTrigger } from '@/components/layout/CommandPalette'
+import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import MembersTab from '@/components/admin/MembersTab'
 import InvitesTab from '@/components/admin/InvitesTab'
 import SettingsTab from '@/components/admin/SettingsTab'
@@ -165,52 +163,25 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <Toast toast={toast} onClose={() => setToast(null)} />
+    <div className="flex min-h-screen bg-slate-50">
+      <WorkspaceSidebar user={user} current="admin" onSignOut={handleSignOut} />
 
-      <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6">
-            <Logo />
-            <nav className="flex items-center gap-1 text-sm">
-              <Link
-                href="/workspace"
-                className="rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Workspace
-              </Link>
-              <Link
-                href="/home"
-                className="rounded-md px-3 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Parts
-              </Link>
-              <Link
-                href="/admin"
-                aria-current="page"
-                className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-3 py-1.5 font-semibold text-slate-900"
-              >
-                <Crown className="h-3.5 w-3.5" />
-                Admin
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <QuickSearchTrigger />
-            <NotificationsBell />
-            <UserBadge name={user.name} email={user.email} />
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <section className="mx-auto max-w-6xl px-6 py-8">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Crown className="h-3 w-3 text-primary" />
+            <span className="font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="font-semibold text-slate-900">Admin</span>
+          </div>
+          <NotificationsBell />
+        </header>
+
+      <section className="mx-auto w-full max-w-6xl px-6 py-8">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 p-6 text-white shadow-lg">
           <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-brand opacity-25 blur-3xl" />
@@ -397,6 +368,7 @@ export default function AdminPage() {
           Demo workspace · Changes here are mock data and reset on page refresh.
         </p>
       </section>
-    </main>
+      </div>
+    </div>
   )
 }

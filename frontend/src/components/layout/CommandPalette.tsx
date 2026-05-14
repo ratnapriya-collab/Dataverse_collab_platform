@@ -17,6 +17,7 @@ import {
   Building2,
   Crown,
   FolderKanban,
+  Inbox,
   Plus,
   Search,
   Upload,
@@ -94,6 +95,7 @@ export default function CommandPalette() {
   const items = useMemo<CmdItem[]>(() => {
     const list: CmdItem[] = [
       { id: 'nav-workspace', label: 'Go to Workspace', icon: Building2, href: '/workspace', kind: 'nav' },
+      { id: 'nav-my-work', label: 'Go to My Work', icon: Inbox, href: '/my-work', kind: 'nav' },
       { id: 'nav-parts', label: 'Go to Parts', icon: FolderKanban, href: '/home', kind: 'nav' },
       { id: 'nav-admin', label: 'Go to Admin', icon: Crown, href: '/admin', kind: 'nav' },
       { id: 'nav-viewer', label: '3D viewer demo', icon: Search, href: '/viewer', kind: 'nav' },

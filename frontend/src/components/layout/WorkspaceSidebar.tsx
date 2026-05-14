@@ -22,13 +22,14 @@ import {
   Crown,
   FolderKanban,
   Home,
+  Inbox,
   LogOut,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
 import { HexMark } from '@/components/ui/Logo'
 import Avatar from '@/components/workspace/Avatar'
-import { SEED_PROJECTS } from '@/lib/mockWorkspace'
+import { SEED_PROJECTS, SEED_WORK_ITEMS } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
 export type SidebarSection = 'dashboard' | 'my_work' | 'projects' | 'admin'
@@ -70,8 +71,17 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
     }
   }, [userMenuOpen])
 
+  const assignedToYou = SEED_WORK_ITEMS.filter((w) => w.tab === 'assigned').length
+
   const items: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/workspace' },
+    {
+      id: 'my_work',
+      label: 'My Work',
+      icon: Inbox,
+      href: '/my-work',
+      badge: assignedToYou > 0 ? assignedToYou : undefined,
+    },
     {
       id: 'projects',
       label: 'Projects',

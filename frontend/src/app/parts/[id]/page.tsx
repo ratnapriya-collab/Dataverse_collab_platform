@@ -150,11 +150,32 @@ export default function PartPage() {
     for (const [faceUuid, group] of byFace) {
       const dominant = pickDominantDecision(group.decisions)
       if (dominant === null) continue
+      const ts = new Date(dominant.created_at).getTime()
+      const ageMin = Math.max(1, Math.round((Date.now() - ts) / 60_000))
+      const when =
+        ageMin < 60
+          ? `${ageMin}m ago`
+          : ageMin < 1440
+          ? `${Math.round(ageMin / 60)}h ago`
+          : `${Math.round(ageMin / 1440)}d ago`
+
+      // Auto-extract citation-like tokens from the rationale to render as
+      // chip tags in the card. Matches AS9100 §6.4.3, ISO 1101, DEC-…, etc.
+      const tagMatches = dominant.rationale.match(
+        /\b(?:AS\s?\d+(?:\s§\d+(?:\.\d+)+)?|ISO\s?\d+(?:-\d+)?|ASME\s?Y?\d+\.\d+|MIL-STD-\d+|DIN\s?\d+|OSHA-\d+\.\d+|DEC-[A-Z0-9-]+)/g,
+      )
+      const tags = tagMatches !== null ? Array.from(new Set(tagMatches)).slice(0, 3) : []
+
       labelList.push({
         faceUuid,
         centroid: group.centroid,
-        text: truncate(dominant.rationale, 48),
+        text: truncate(dominant.rationale, 180),
         tone: STATE_TONE[dominant.state],
+        authorName: dominant.author?.name ?? 'You',
+        when,
+        tags,
+        replyCount: group.decisions.length > 1 ? group.decisions.length - 1 : 0,
+        locked: dominant.state === 'ACCEPTED' || dominant.state === 'SUPERSEDED',
       })
     }
     return labelList

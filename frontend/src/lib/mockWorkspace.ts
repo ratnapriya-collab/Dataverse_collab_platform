@@ -905,6 +905,299 @@ export const SEED_PENDING_DECISIONS: MockPendingDecision[] = [
   },
 ]
 
+// ── Decisions feed (workspace-wide, richer than SEED_PENDING_DECISIONS) ──────
+
+export type FullDecisionState =
+  | 'DRAFT'
+  | 'PROPOSED'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'SUPERSEDED'
+
+export interface MockFullDecision {
+  id: string
+  project_id: string
+  project_name: string
+  part_id: string
+  part_name: string
+  anchor_id: string
+  state: FullDecisionState
+  rationale: string
+  author_name: string
+  author_team: EngineeringTeam
+  citations: string[]
+  created_at: string
+  signoff_progress?: { responded: number; total: number }
+}
+
+export const SEED_FULL_DECISIONS: MockFullDecision[] = [
+  {
+    id: 'DEC-TURBO-V3-11',
+    project_id: 'proj_turbo',
+    project_name: 'Turbocharger Compressor Housing V3',
+    part_id: 'demo_1',
+    part_name: 'Compressor Housing v2',
+    anchor_id: 'face-boss-7',
+    state: 'PROPOSED',
+    rationale:
+      'Wall thickness 1.6 mm at Z3 is below the 2.0 mm minimum spec. Acceptable only with documented FEA justification per AS9100 §6.4.3.',
+    author_name: 'Sarah Chen',
+    author_team: 'CAE',
+    citations: ['AS9100 §6.4.3', 'DEC-TURBO-V3-08'],
+    created_at: new Date(NOW - 25 * 60_000).toISOString(),
+    signoff_progress: { responded: 1, total: 3 },
+  },
+  {
+    id: 'DEC-BRACKET-09',
+    project_id: 'proj_bracket',
+    project_name: 'Wing Spar Bracket Assembly',
+    part_id: 'demo_2',
+    part_name: 'Wing Spar Bracket rev3',
+    anchor_id: 'hole-bolt-3',
+    state: 'PROPOSED',
+    rationale:
+      'Bolt hole pattern offset by 0.3 mm vs. drawing. Confirm whether intentional for tolerance stack on the mating boss; otherwise revert to nominal.',
+    author_name: 'John Williams',
+    author_team: 'SUPPLIER',
+    citations: ['ASME Y14.5 §1.4', 'DRW-BRACKET-B'],
+    created_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+    signoff_progress: { responded: 0, total: 4 },
+  },
+  {
+    id: 'DEC-TURBO-V3-08',
+    project_id: 'proj_turbo',
+    project_name: 'Turbocharger Compressor Housing V3',
+    part_id: 'demo_1',
+    part_name: 'Compressor Housing v2',
+    anchor_id: 'face-flange-1',
+    state: 'ACCEPTED',
+    rationale:
+      'Surface roughness on the inlet flange tightened from Ra 3.2 µm → Ra 1.6 µm to meet sealing requirements per the gasket vendor datasheet.',
+    author_name: 'Maria Garcia',
+    author_team: 'REVIEWER',
+    citations: ['ISO 1101', 'GASKET-DS-9911'],
+    created_at: new Date(NOW - 1 * DAYS).toISOString(),
+    signoff_progress: { responded: 3, total: 3 },
+  },
+  {
+    id: 'DEC-BRACKET-07',
+    project_id: 'proj_bracket',
+    project_name: 'Wing Spar Bracket Assembly',
+    part_id: 'demo_2',
+    part_name: 'Wing Spar Bracket rev3',
+    anchor_id: 'edge-fillet-2',
+    state: 'ACCEPTED',
+    rationale:
+      'Fillet radius increased from R1.5 to R2.5 on the load-bearing edge to mitigate fatigue stress concentration identified in the CAE report.',
+    author_name: 'Sarah Chen',
+    author_team: 'CAE',
+    citations: ['CAE-RUN-2026-04-11', 'MIL-STD-1916'],
+    created_at: new Date(NOW - 2 * DAYS).toISOString(),
+    signoff_progress: { responded: 4, total: 4 },
+  },
+  {
+    id: 'DEC-GEAR-12',
+    project_id: 'proj_gear',
+    project_name: 'HP Turbine Blade Disk',
+    part_id: 'demo_3',
+    part_name: 'Turbine Disk Hub',
+    anchor_id: 'face-spline-1',
+    state: 'ACCEPTED',
+    rationale:
+      'Spline tolerance class upgraded from 7e to 6f per the gearbox interface ICD. CMM data attached.',
+    author_name: 'Sarah Chen',
+    author_team: 'CAE',
+    citations: ['ICD-GEARBOX-V3', 'CMM-2026-05-04'],
+    created_at: new Date(NOW - 3 * DAYS).toISOString(),
+    signoff_progress: { responded: 3, total: 3 },
+  },
+  {
+    id: 'DEC-BRACKET-05',
+    project_id: 'proj_bracket',
+    project_name: 'Wing Spar Bracket Assembly',
+    part_id: 'demo_2',
+    part_name: 'Wing Spar Bracket rev3',
+    anchor_id: 'face-rib-4',
+    state: 'REJECTED',
+    rationale:
+      'Proposed rib relocation to reduce mass by 7% was rejected — the new position interferes with the harness routing defined in the wiring drawing.',
+    author_name: 'John Williams',
+    author_team: 'SUPPLIER',
+    citations: ['HARNESS-DRW-2208'],
+    created_at: new Date(NOW - 5 * DAYS).toISOString(),
+  },
+  {
+    id: 'DEC-PLATE-04',
+    project_id: 'proj_plate',
+    project_name: 'EV Battery Cooling Plate',
+    part_id: 'demo_4',
+    part_name: 'Battery Cold Plate',
+    anchor_id: 'edge-perimeter',
+    state: 'PROPOSED',
+    rationale:
+      'Plate edges deburred to 0.2 mm × 45° chamfer to meet operator-safety requirement for downstream assembly.',
+    author_name: 'Maria Garcia',
+    author_team: 'REVIEWER',
+    citations: ['OSHA-1910.23'],
+    created_at: new Date(NOW - 9 * 3_600_000).toISOString(),
+    signoff_progress: { responded: 1, total: 2 },
+  },
+  {
+    id: 'DEC-PLATE-02',
+    project_id: 'proj_plate',
+    project_name: 'EV Battery Cooling Plate',
+    part_id: 'demo_4',
+    part_name: 'Battery Cold Plate',
+    anchor_id: 'hole-pattern-A',
+    state: 'PROPOSED',
+    rationale:
+      'Centre-to-centre tolerance loosened from ±0.05 mm to ±0.10 mm — confirmed acceptable by stress review and brings the part into the standard machining tolerance band.',
+    author_name: 'You',
+    author_team: 'DESIGN',
+    citations: ['ASME Y14.5 §1.4', 'CAE-RUN-2026-05-08'],
+    created_at: new Date(NOW - 4 * 3_600_000).toISOString(),
+    signoff_progress: { responded: 1, total: 3 },
+  },
+  {
+    id: 'DEC-INTAKE-01',
+    project_id: 'proj_intake',
+    project_name: 'Heat Exchanger Core',
+    part_id: 'demo_intake_1',
+    part_name: 'Heat Exchanger Core v1',
+    anchor_id: 'face-fin-A',
+    state: 'PROPOSED',
+    rationale:
+      'CFD analysis suggests fin spacing reduction from 4.0 mm to 3.2 mm yields a 12% thermal-transfer improvement at the operating Reynolds number.',
+    author_name: 'Sarah Chen',
+    author_team: 'CAE',
+    citations: ['CFD-RUN-2026-05-10', 'ASHRAE-HX-V3'],
+    created_at: new Date(NOW - 6 * 3_600_000).toISOString(),
+    signoff_progress: { responded: 0, total: 3 },
+  },
+  {
+    id: 'DEC-TURBO-V3-04',
+    project_id: 'proj_turbo',
+    project_name: 'Turbocharger Compressor Housing V3',
+    part_id: 'demo_1',
+    part_name: 'Compressor Housing v2',
+    anchor_id: 'face-boss-7',
+    state: 'SUPERSEDED',
+    rationale:
+      'Initial proposal to chamfer the boss edge — superseded by DEC-TURBO-V3-08 which addresses both the chamfer and the surface finish in a single change.',
+    author_name: 'Maria Garcia',
+    author_team: 'REVIEWER',
+    citations: [],
+    created_at: new Date(NOW - 9 * DAYS).toISOString(),
+  },
+  {
+    id: 'DEC-GEAR-08',
+    project_id: 'proj_gear',
+    project_name: 'HP Turbine Blade Disk',
+    part_id: 'demo_3',
+    part_name: 'Turbine Disk Hub',
+    anchor_id: 'face-keyway-1',
+    state: 'ACCEPTED',
+    rationale:
+      'Keyway dimensions confirmed to DIN 6885 (8×7×40) per the motor-side coupling spec.',
+    author_name: 'Maria Garcia',
+    author_team: 'REVIEWER',
+    citations: ['DIN 6885', 'COUPLING-MOTOR-SIDE-V2'],
+    created_at: new Date(NOW - 8 * DAYS).toISOString(),
+    signoff_progress: { responded: 3, total: 3 },
+  },
+  {
+    id: 'DEC-COOLING-01',
+    project_id: 'proj_cooling',
+    project_name: 'Liquid Cooling Loop (legacy)',
+    part_id: 'demo_cooling_1',
+    part_name: 'Cooling Loop Manifold',
+    anchor_id: 'face-port-A',
+    state: 'ACCEPTED',
+    rationale:
+      'Port diameter standardized to G1/2" BSPP across both manifold variants to share inventory with the new plate-fin design.',
+    author_name: 'David Kim',
+    author_team: 'MANUFACTURING',
+    citations: ['ISO 228-1'],
+    created_at: new Date(NOW - 35 * DAYS).toISOString(),
+    signoff_progress: { responded: 2, total: 2 },
+  },
+]
+
+// ── Cross-rev resolver mock (used by /parts/[id]/what-changed) ───────────────
+
+export interface MockResolverBucket {
+  id: string
+  decision_id: string
+  title: string
+  anchor_id?: string
+  confidence: number // 0..1
+}
+
+export interface MockResolverResult {
+  part_id: string
+  from_rev: string
+  to_rev: string
+  auto_carried: MockResolverBucket[]
+  requires_confirmation: MockResolverBucket[]
+  resolved: MockResolverBucket[]
+  regressed: MockResolverBucket[]
+  orphaned: MockResolverBucket[]
+}
+
+export const SEED_RESOLVER_RESULT: MockResolverResult = {
+  part_id: 'demo_2',
+  from_rev: 'Rev A',
+  to_rev: 'Rev B',
+  auto_carried: [
+    { id: 'r-1', decision_id: 'DEC-BRACKET-01', title: 'Initial bolt hole pattern', confidence: 0.99 },
+    { id: 'r-2', decision_id: 'DEC-BRACKET-02', title: 'Material grade Ti-6Al-4V', confidence: 0.99 },
+    { id: 'r-3', decision_id: 'DEC-BRACKET-03', title: 'Mounting boss diameter', confidence: 0.96 },
+    { id: 'r-4', decision_id: 'DEC-BRACKET-06', title: 'Heat treatment specification', confidence: 0.94 },
+    { id: 'r-5', decision_id: 'DEC-BRACKET-07', title: 'Fillet radius R2.5 on load edge', confidence: 0.92 },
+    { id: 'r-6', decision_id: 'DEC-BRACKET-08', title: 'Surface finish Ra 1.6 µm on flange', confidence: 0.91 },
+    { id: 'r-7', decision_id: 'DEC-BRACKET-10', title: 'Coating thickness 25–35 µm', confidence: 0.88 },
+    { id: 'r-8', decision_id: 'DEC-BRACKET-12', title: 'Edge break 0.2 mm × 45°', confidence: 0.87 },
+  ],
+  requires_confirmation: [
+    {
+      id: 'r-9',
+      decision_id: 'DEC-BRACKET-04',
+      title: 'Boss chamfer 1.0 × 45°',
+      anchor_id: 'face-boss-7',
+      confidence: 0.71,
+    },
+    {
+      id: 'r-10',
+      decision_id: 'DEC-BRACKET-09',
+      title: 'Bolt hole offset 0.3 mm',
+      anchor_id: 'hole-bolt-3',
+      confidence: 0.66,
+    },
+    {
+      id: 'r-11',
+      decision_id: 'DEC-BRACKET-11',
+      title: 'Wall thickness 1.6 mm at Z3',
+      anchor_id: 'face-boss-7',
+      confidence: 0.61,
+    },
+  ],
+  resolved: [
+    { id: 'r-12', decision_id: 'DEC-BRACKET-13', title: 'Pocket draft angle (added in Rev B)', confidence: 1 },
+    { id: 'r-13', decision_id: 'DEC-BRACKET-14', title: 'Rib reinforcement (added in Rev B)', confidence: 1 },
+    { id: 'r-14', decision_id: 'DEC-BRACKET-15', title: 'Lightening hole pattern (added in Rev B)', confidence: 1 },
+  ],
+  regressed: [
+    {
+      id: 'r-15',
+      decision_id: 'DEC-BRACKET-05',
+      title: 'Rib relocation rejected',
+      anchor_id: 'face-rib-4',
+      confidence: 0.42,
+    },
+  ],
+  orphaned: [],
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Replace the placeholder "You" member with the signed-in user's real info. */

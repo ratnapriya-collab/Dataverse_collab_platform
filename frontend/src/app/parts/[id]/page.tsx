@@ -253,6 +253,38 @@ export default function PartPage() {
             />
           </dl>
 
+          {/* Part tools quick-nav (mock companion screens) */}
+          <div className="mt-4 grid grid-cols-2 gap-1.5">
+            <Link
+              href={`/parts/${part.id}/what-changed`}
+              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
+            >
+              <span className="text-base leading-none">↻</span>
+              What changed
+            </Link>
+            <Link
+              href={`/parts/${part.id}/walkthrough`}
+              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
+            >
+              <span className="text-base leading-none">▶</span>
+              Walkthrough
+            </Link>
+            <Link
+              href={`/parts/${part.id}/concierge`}
+              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
+            >
+              <span className="text-base leading-none">✨</span>
+              Concierge
+            </Link>
+            <Link
+              href={`/parts/${part.id}/plm-push`}
+              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
+            >
+              <span className="text-base leading-none">↗</span>
+              Push to PLM
+            </Link>
+          </div>
+
           <hr className="my-5 border-slate-200" />
 
           <DecisionsPanel

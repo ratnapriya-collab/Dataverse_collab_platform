@@ -20,7 +20,9 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ChevronDown,
   Crown,
+  FileCheck2,
   FolderKanban,
+  History,
   Home,
   Inbox,
   LogOut,
@@ -32,7 +34,13 @@ import Avatar from '@/components/workspace/Avatar'
 import { SEED_PROJECTS, SEED_WORK_ITEMS } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
-export type SidebarSection = 'dashboard' | 'my_work' | 'projects' | 'admin'
+export type SidebarSection =
+  | 'dashboard'
+  | 'my_work'
+  | 'projects'
+  | 'decisions'
+  | 'audit'
+  | 'admin'
 
 interface NavItem {
   id: SidebarSection
@@ -88,6 +96,18 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       icon: FolderKanban,
       href: '/workspace',
       badge: SEED_PROJECTS.length,
+    },
+    {
+      id: 'decisions',
+      label: 'Decisions',
+      icon: FileCheck2,
+      href: '/decisions',
+    },
+    {
+      id: 'audit',
+      label: 'Audit',
+      icon: History,
+      href: '/audit',
     },
     {
       id: 'admin',

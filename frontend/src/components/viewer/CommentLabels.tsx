@@ -18,7 +18,7 @@
  * so callouts at clustered anchors don't overlap.
  */
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useViewerStore } from '@/_viewer/store/viewerStore'
 import { projectAnchor } from '@/lib/viewerPins'
 
@@ -151,6 +151,21 @@ function offsetFor(faceUuid: string): { dx: number; dy: number } {
   return OFFSETS[Math.abs(h) % OFFSETS.length] as { dx: number; dy: number }
 }
 
+// ── Mentionable people (same 5 as the Create Decision modal) ────────────────
+
+interface MentionPerson {
+  name: string
+  role: string
+}
+
+const MENTIONABLE_PEOPLE: MentionPerson[] = [
+  { name: 'Naga Reddy', role: 'Design Lead' },
+  { name: 'Sarah Chen', role: 'CAE Engineer' },
+  { name: 'John Williams', role: 'Supplier Lead' },
+  { name: 'Maria Garcia', role: 'Stress Reviewer' },
+  { name: 'David Kim', role: 'Engineering Manager' },
+]
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 const PIN_FILL = '#15524a' // primary teal — uniform pin colour, CoLab-style
@@ -166,6 +181,48 @@ export default function CommentLabels({ labels, onClick }: Props) {
   const labelRefs = useRef<Map<string, HTMLElement>>(new Map())
   const lineRefs = useRef<Map<string, SVGLineElement>>(new Map())
   const pinRefs = useRef<Map<string, SVGGElement>>(new Map())
+
+  // Tag-picker UI state — which card's picker is open, and who's tagged where.
+  const [tagPickerOpenFor, setTagPickerOpenFor] = useState<string | null>(null)
+  const [taggedByCard, setTaggedByCard] = useState<Map<string, Set<string>>>(
+    () => new Map(),
+  )
+
+  function toggleTagPicker(faceUuid: string): void {
+    setTagPickerOpenFor((prev) => (prev === faceUuid ? null : faceUuid))
+  }
+
+  function addTag(faceUuid: string, name: string): void {
+    setTaggedByCard((prev) => {
+      const next = new Map(prev)
+      const set = new Set(next.get(faceUuid) ?? [])
+      set.add(name)
+      next.set(faceUuid, set)
+      return next
+    })
+    setTagPickerOpenFor(null)
+  }
+
+  function removeTag(faceUuid: string, name: string): void {
+    setTaggedByCard((prev) => {
+      const next = new Map(prev)
+      const set = new Set(next.get(faceUuid) ?? [])
+      set.delete(name)
+      if (set.size === 0) next.delete(faceUuid)
+      else next.set(faceUuid, set)
+      return next
+    })
+  }
+
+  // Close any open tag-picker on ESC.
+  useEffect(() => {
+    if (tagPickerOpenFor === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTagPickerOpenFor(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tagPickerOpenFor])
 
   useEffect(() => {
     if (!scene) return
@@ -271,16 +328,26 @@ export default function CommentLabels({ labels, onClick }: Props) {
         const author = m.authorName ?? 'You'
         const statePill = STATE_PILL_TONE[m.tone]
         const stateText = m.headerLabel ?? TONE_LABEL[m.tone]
+        const tagged = taggedByCard.get(m.faceUuid) ?? new Set<string>()
+        const pickerOpen = tagPickerOpenFor === m.faceUuid
         return (
-          <button
+          <article
             key={`card-${m.faceUuid}`}
             ref={(el) => {
               if (el !== null) labelRefs.current.set(m.faceUuid, el)
               else labelRefs.current.delete(m.faceUuid)
             }}
-            type="button"
+            role="button"
+            tabIndex={0}
+            aria-label={`Decision by ${author}`}
             onClick={() => onClick?.(m.faceUuid)}
-            className="pointer-events-auto absolute left-0 top-0 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-xl ring-1 ring-black/5 transition hover:shadow-2xl"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.(m.faceUuid)
+              }
+            }}
+            className="pointer-events-auto absolute left-0 top-0 w-[300px] cursor-pointer overflow-visible rounded-2xl border border-slate-200 bg-white text-left shadow-xl ring-1 ring-black/5 transition hover:shadow-2xl"
             style={{
               opacity: 0,
               transform: 'translate3d(-9999px, -9999px, 0)',
@@ -365,6 +432,51 @@ export default function CommentLabels({ labels, onClick }: Props) {
               </div>
             )}
 
+            {/* ── Tagged teammates (from the +person picker) ──────────────── */}
+            {tagged.size > 0 && (
+              <div className="flex items-center gap-2 border-t border-slate-100 px-3.5 py-1.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                  Tagged
+                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {Array.from(tagged).map((name) => (
+                    <span
+                      key={name}
+                      className="group/tag inline-flex items-center gap-1 rounded-full bg-primary-50 py-0.5 pl-0.5 pr-1.5 text-[10px] font-semibold text-primary-700 ring-1 ring-primary-100"
+                    >
+                      <img
+                        src={`https://i.pravatar.cc/40?u=${encodeURIComponent(name)}`}
+                        alt=""
+                        width={14}
+                        height={14}
+                        loading="lazy"
+                        className="h-[14px] w-[14px] rounded-full bg-slate-200 object-cover"
+                      />
+                      @{name}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${name}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeTag(m.faceUuid, name)
+                        }}
+                        className="ml-0.5 rounded-full p-0.5 text-primary-700/60 opacity-0 transition hover:bg-primary-100 hover:text-primary-900 group-hover/tag:opacity-100"
+                      >
+                        <svg viewBox="0 0 16 16" width="8" height="8" aria-hidden="true">
+                          <path
+                            d="M4 4 L12 12 M12 4 L4 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* ── Footer: replies + actions ───────────────────────────────── */}
             <footer className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-3.5 py-1.5">
               {(() => {
@@ -387,50 +499,151 @@ export default function CommentLabels({ labels, onClick }: Props) {
                   </span>
                 )
               })()}
-              <div className="flex items-center gap-0.5 text-slate-400">
+              <div className="relative flex items-center gap-0.5 text-slate-400">
                 {/* ··· menu */}
-                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-                  <circle cx="3" cy="8" r="1.2" fill="currentColor" />
-                  <circle cx="8" cy="8" r="1.2" fill="currentColor" />
-                  <circle cx="13" cy="8" r="1.2" fill="currentColor" />
-                </svg>
-                {/* +person */}
-                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-                  <circle cx="6" cy="6" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-                  <path
-                    d="M2 14 a4 4 0 0 1 8 0"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    fill="none"
-                  />
-                  <path
-                    d="M12 6 v4 M10 8 h4"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                {/* checkmark — green if accepted */}
-                <svg
-                  viewBox="0 0 16 16"
-                  width="13"
-                  height="13"
-                  aria-hidden="true"
-                  className={m.tone === 'green' ? 'text-emerald-600' : ''}
+                <button
+                  type="button"
+                  aria-label="More actions"
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded p-1 hover:bg-slate-200 hover:text-slate-700"
                 >
-                  <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-                  <path
-                    d="M5 8 L7 10 L11 6"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                    <circle cx="3" cy="8" r="1.2" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                    <circle cx="13" cy="8" r="1.2" fill="currentColor" />
+                  </svg>
+                </button>
+
+                {/* +person — opens tag picker */}
+                <button
+                  type="button"
+                  aria-label="Tag a teammate"
+                  aria-expanded={pickerOpen}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleTagPicker(m.faceUuid)
+                  }}
+                  className={`rounded p-1 transition ${
+                    pickerOpen
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'hover:bg-slate-200 hover:text-slate-700'
+                  }`}
+                >
+                  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                    <circle cx="6" cy="6" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                    <path
+                      d="M2 14 a4 4 0 0 1 8 0"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      fill="none"
+                    />
+                    <path
+                      d="M12 6 v4 M10 8 h4"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+
+                {/* checkmark — green if accepted */}
+                <button
+                  type="button"
+                  aria-label="Mark resolved"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`rounded p-1 hover:bg-slate-200 hover:text-slate-700 ${
+                    m.tone === 'green' ? 'text-emerald-600' : ''
+                  }`}
+                >
+                  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                    <path
+                      d="M5 8 L7 10 L11 6"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {/* Tag-picker popup — anchored above the +person icon */}
+                {pickerOpen && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute bottom-full right-0 z-40 mb-2 w-60 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-3 py-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        Tag a teammate
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Close picker"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setTagPickerOpenFor(null)
+                        }}
+                        className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+                          <path
+                            d="M4 4 L12 12 M12 4 L4 12"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <ul className="max-h-56 overflow-y-auto">
+                      {MENTIONABLE_PEOPLE.map((p) => {
+                        const already = tagged.has(p.name)
+                        return (
+                          <li key={p.name}>
+                            <button
+                              type="button"
+                              disabled={already}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                addTag(m.faceUuid, p.name)
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left transition ${
+                                already
+                                  ? 'cursor-default opacity-50'
+                                  : 'hover:bg-primary-50'
+                              }`}
+                            >
+                              <img
+                                src={`https://i.pravatar.cc/56?u=${encodeURIComponent(p.name)}`}
+                                alt=""
+                                width={22}
+                                height={22}
+                                loading="lazy"
+                                className="h-[22px] w-[22px] shrink-0 rounded-full bg-slate-200 object-cover ring-2 ring-white"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[12px] font-semibold text-slate-900">
+                                  {p.name}
+                                </p>
+                                <p className="truncate text-[10px] text-slate-500">{p.role}</p>
+                              </div>
+                              {already && (
+                                <span className="shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                                  Added
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
               </div>
             </footer>
-          </button>
+          </article>
         )
       })}
     </div>

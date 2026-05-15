@@ -1,12 +1,74 @@
 'use client'
 
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Sparkles, X } from 'lucide-react'
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { AtSign, Sparkles, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import type { AnchorRead, Centroid, DecisionRead } from '@/types/api'
 
 const MIN_RATIONALE = 10
 const MAX_RATIONALE = 4000
+
+// ── @mention support ────────────────────────────────────────────────────────
+
+interface MentionPerson {
+  name: string
+  role: string
+  email: string
+}
+
+/** Five teammates you can tag from inside the comment box. */
+const MENTIONABLE_PEOPLE: MentionPerson[] = [
+  { name: 'Naga Reddy', role: 'Design Lead', email: 'naga.reddy@oem-aero.com' },
+  { name: 'Sarah Chen', role: 'CAE Engineer', email: 'sarah.chen@oem-aero.com' },
+  { name: 'John Williams', role: 'Supplier Lead', email: 'j.williams@precision-supply.io' },
+  { name: 'Maria Garcia', role: 'Stress Reviewer', email: 'maria.g@stress-review.io' },
+  { name: 'David Kim', role: 'Engineering Manager', email: 'd.kim@oem-aero.com' },
+]
+
+/** Matches `@nagareddy`, `@naga`, `@Naga`, etc. against "Naga Reddy". */
+function matchesPerson(p: MentionPerson, query: string): boolean {
+  if (query.length === 0) return true
+  const q = query.toLowerCase()
+  const nameLower = p.name.toLowerCase()
+  return (
+    nameLower.includes(q) ||
+    nameLower.replace(/\s+/g, '').includes(q) ||
+    p.email.toLowerCase().includes(q)
+  )
+}
+
+/**
+ * Walk backwards from the cursor looking for an `@` that's at a word boundary
+ * (start of string or after whitespace). Returns the query slice between
+ * `@` and the cursor, or { open: false } if there's no active mention.
+ */
+function detectMention(
+  value: string,
+  cursor: number,
+): { open: boolean; query: string; startIdx: number } {
+  for (let i = cursor - 1; i >= 0; i--) {
+    const ch = value[i]
+    if (ch === '@') {
+      const isWordBoundary = i === 0 || /\s/.test(value[i - 1] ?? '')
+      if (isWordBoundary) {
+        const query = value.slice(i + 1, cursor)
+        if (!/\s/.test(query)) return { open: true, query, startIdx: i }
+      }
+      return { open: false, query: '', startIdx: -1 }
+    }
+    if (ch === undefined || /\s/.test(ch)) return { open: false, query: '', startIdx: -1 }
+  }
+  return { open: false, query: '', startIdx: -1 }
+}
 
 interface Props {
   partId: string
@@ -31,6 +93,73 @@ export default function CreateDecisionModal({
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
+
+  // @mention dropdown state
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionStart, setMentionStart] = useState(-1)
+  const [mentionActiveIdx, setMentionActiveIdx] = useState(0)
+
+  // Names currently tagged in the rationale — drives the "Will notify" chips.
+  const detectedMentions = useMemo(
+    () => MENTIONABLE_PEOPLE.filter((p) => rationale.includes(`@${p.name}`)),
+    [rationale],
+  )
+
+  // Live-filtered candidate list, only when the dropdown is open.
+  const filteredPeople = useMemo<MentionPerson[]>(() => {
+    if (!mentionOpen) return []
+    return MENTIONABLE_PEOPLE.filter((p) => matchesPerson(p, mentionQuery))
+  }, [mentionOpen, mentionQuery])
+
+  function handleRationaleChange(e: ChangeEvent<HTMLTextAreaElement>): void {
+    const value = e.target.value
+    const cursor = e.target.selectionStart
+    setRationale(value)
+    const d = detectMention(value, cursor)
+    setMentionOpen(d.open)
+    setMentionQuery(d.query)
+    setMentionStart(d.startIdx)
+    setMentionActiveIdx(0)
+  }
+
+  function insertMention(person: MentionPerson): void {
+    if (mentionStart < 0) return
+    const cursor = textareaRef.current?.selectionStart ?? mentionStart + 1
+    const before = rationale.slice(0, mentionStart)
+    const after = rationale.slice(cursor)
+    const mention = `@${person.name} `
+    const newValue = before + mention + after
+    setRationale(newValue)
+    setMentionOpen(false)
+    setMentionQuery('')
+    setMentionStart(-1)
+    const newCursor = before.length + mention.length
+    requestAnimationFrame(() => {
+      if (textareaRef.current !== null) {
+        textareaRef.current.focus()
+        textareaRef.current.setSelectionRange(newCursor, newCursor)
+      }
+    })
+  }
+
+  function handleTextareaKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>): void {
+    if (!mentionOpen || filteredPeople.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setMentionActiveIdx((i) => Math.min(i + 1, filteredPeople.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMentionActiveIdx((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      const sel = filteredPeople[mentionActiveIdx]
+      if (sel !== undefined) insertMention(sel)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setMentionOpen(false)
+    }
+  }
 
   // Close on ESC + focus management.
   useEffect(() => {
@@ -140,16 +269,123 @@ export default function CreateDecisionModal({
           <p className="mt-1 text-xs text-slate-500">
             Minimum 10 characters. This becomes the decision's rationale — make it specific.
           </p>
-          <textarea
-            id="rationale"
-            ref={textareaRef}
-            value={rationale}
-            onChange={(e) => setRationale(e.target.value)}
-            rows={5}
-            maxLength={MAX_RATIONALE}
-            placeholder="e.g. Wall thickness 1.6 mm at Z3 is below 2.0 mm minimum per spec"
-            className="mt-2 w-full resize-none rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
+          <div className="relative mt-2">
+            <textarea
+              id="rationale"
+              ref={textareaRef}
+              value={rationale}
+              onChange={handleRationaleChange}
+              onKeyDown={handleTextareaKeyDown}
+              rows={5}
+              maxLength={MAX_RATIONALE}
+              placeholder="e.g. Wall thickness 1.6 mm at Z3 is below 2.0 mm minimum — type @ to tag a teammate"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+
+            {/* @mention dropdown — anchored under the textarea */}
+            {mentionOpen && filteredPeople.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-3 py-1.5">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <AtSign className="h-3 w-3" />
+                    {mentionQuery.length > 0
+                      ? `People matching "${mentionQuery}"`
+                      : 'Tag someone'}
+                  </span>
+                  <span className="text-[10px] tabular-nums text-slate-400">
+                    {filteredPeople.length} of {MENTIONABLE_PEOPLE.length}
+                  </span>
+                </div>
+                <ul
+                  role="listbox"
+                  aria-label="Mention suggestions"
+                  className="max-h-64 overflow-y-auto"
+                >
+                  {filteredPeople.map((p, i) => {
+                    const active = i === mentionActiveIdx
+                    return (
+                      <li key={p.email}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onMouseDown={(e) => {
+                            e.preventDefault() // keep textarea focused
+                            insertMention(p)
+                          }}
+                          onMouseEnter={() => setMentionActiveIdx(i)}
+                          className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition ${
+                            active ? 'bg-primary-50' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <img
+                            src={`https://i.pravatar.cc/56?u=${encodeURIComponent(p.name)}`}
+                            alt=""
+                            width={28}
+                            height={28}
+                            loading="lazy"
+                            className="h-7 w-7 shrink-0 rounded-full bg-slate-200 object-cover ring-2 ring-white"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`truncate text-sm font-semibold ${
+                                active ? 'text-primary-900' : 'text-slate-900'
+                              }`}
+                            >
+                              {p.name}
+                            </p>
+                            <p className="truncate text-[10px] text-slate-500">
+                              {p.role} · {p.email}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-bold text-slate-600">
+                            @{(p.name.split(' ')[0] ?? '').toLowerCase()}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-1.5 text-[10px] text-slate-500">
+                  <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">↑↓</kbd>
+                  navigate
+                  <kbd className="ml-0.5 rounded border border-slate-200 bg-white px-1 font-mono">
+                    Enter
+                  </kbd>
+                  select
+                  <kbd className="ml-0.5 rounded border border-slate-200 bg-white px-1 font-mono">
+                    Esc
+                  </kbd>
+                  cancel
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* "Will notify" chip row — visible only when mentions are present */}
+          {detectedMentions.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Will notify:
+              </span>
+              {detectedMentions.map((p) => (
+                <span
+                  key={p.email}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 ring-1 ring-primary-100"
+                >
+                  <img
+                    src={`https://i.pravatar.cc/24?u=${encodeURIComponent(p.name)}`}
+                    alt=""
+                    width={12}
+                    height={12}
+                    loading="lazy"
+                    className="h-3 w-3 rounded-full bg-slate-200 object-cover"
+                  />
+                  @{p.name}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="mt-2 flex items-center justify-between">
             <button

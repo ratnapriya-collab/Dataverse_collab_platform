@@ -157,13 +157,13 @@ const KIND_STYLE: Record<
     icon: GitBranch,
     bg: 'bg-slate-100',
     fg: 'text-slate-700',
-    label: 'Resolver completed',
+    label: 'Resolver finished',
   },
   PLM_PUSHED: {
     icon: Send,
     bg: 'bg-amber-50',
     fg: 'text-amber-700',
-    label: 'PLM pushed',
+    label: 'Pushed to PLM',
   },
   DECISION_SUPERSEDED: {
     icon: History,
@@ -317,11 +317,11 @@ export default function AuditPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
                   <History className="h-3 w-3" />
-                  Workspace · immutable audit trail
+                  Audit trail · immutable
                 </div>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight">Audit log</h1>
-                <p className="mt-1 text-sm leading-relaxed text-white/70">
-                  Every change is permanently recorded — decisions, signoffs, uploads, resolver runs, PLM pushes. Exportable to CSV for compliance.
+                <h1 className="mt-1 text-2xl font-bold tracking-tight">Every change, on the record.</h1>
+                <p className="mt-1 text-sm leading-relaxed text-white/75">
+                  A permanent log of every action your team takes — decisions made, parts uploaded, signoffs collected, revisions resolved, pushes to PLM. Filter, expand to the raw payload, or export to CSV anytime.
                 </p>
               </div>
               <button
@@ -348,6 +348,7 @@ export default function AuditPage() {
               icon={MessageSquare}
               label="Decisions proposed"
               value={proposedCount}
+              hint="raised for review"
               accent="text-amber-600"
               accentBg="bg-amber-50"
             />
@@ -355,14 +356,15 @@ export default function AuditPage() {
               icon={CheckCircle2}
               label="Decisions accepted"
               value={acceptedCount}
+              hint="signed off and locked"
               accent="text-emerald-600"
               accentBg="bg-emerald-50"
             />
             <StatCard
               icon={UserPlus}
-              label="Member events"
+              label="Member activity"
               value={memberCount}
-              hint="joins + invites"
+              hint="joins, invites & role changes"
               accent="text-brand-700"
               accentBg="bg-brand-50"
             />
@@ -405,18 +407,20 @@ export default function AuditPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <Inbox className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">No matching events</p>
-                <p className="mt-1 text-xs text-slate-500">Try a wider filter — every change ever made is in here.</p>
+                <p className="mt-3 text-sm font-semibold text-slate-900">Nothing here yet.</p>
+                <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
+                  Widen your filters — every change your team has ever made is logged in here.
+                </p>
               </div>
             ) : (
               <table className="w-full">
                 <thead className="bg-slate-50/60">
                   <tr className="text-left">
                     <Th>&nbsp;</Th>
-                    <Th>Timestamp</Th>
-                    <Th>Type</Th>
-                    <Th>Actor</Th>
-                    <Th>Target</Th>
+                    <Th>When</Th>
+                    <Th>What happened</Th>
+                    <Th>Who</Th>
+                    <Th>On</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -468,14 +472,14 @@ export default function AuditPage() {
                             <td colSpan={5} className="px-12 py-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                                  Payload
+                                  Raw payload · exactly what was logged
                                 </p>
                                 <button
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-200/60"
                                 >
                                   <FileText className="h-3 w-3" />
-                                  Copy JSON
+                                  Copy as JSON
                                 </button>
                               </div>
                               <pre className="mt-1 overflow-x-auto rounded-md border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100">

@@ -175,14 +175,14 @@ export default function DecisionsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
                   <Clock className="h-3 w-3" />
-                  Workspace · decision feed
+                  Decision feed
                 </div>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight">All decisions</h1>
-                <p className="mt-1 text-sm leading-relaxed text-white/70">
-                  Every anchored decision across {SEED_PROJECTS.length} projects · filterable by state, author, and project.
+                <h1 className="mt-1 text-2xl font-bold tracking-tight">Every decision, in one place.</h1>
+                <p className="mt-1 text-sm leading-relaxed text-white/75">
+                  {SEED_FULL_DECISIONS.length} decisions across {SEED_PROJECTS.length} projects — each anchored to a specific piece of geometry, with the rationale and signoff trail intact.
                 </p>
-                <p className="mt-2 text-[11px] text-white/40">
-                  Decisions are first-class records — anchored to geometry, immutable rationale, full audit trail.
+                <p className="mt-2 text-[11px] text-white/45">
+                  Once anchored, a decision is permanent. Rationale, citations, and supersession carry forward across every revision.
                 </p>
               </div>
             </div>
@@ -192,7 +192,7 @@ export default function DecisionsPage() {
           <div className="dv-anim-fade-up mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" style={{ animationDelay: '80ms' }}>
             <StatCard
               icon={FileCheck2}
-              label="Total decisions"
+              label="Total"
               value={counts.total}
               hint={`across ${SEED_PROJECTS.length} projects`}
               accent="text-primary"
@@ -202,7 +202,7 @@ export default function DecisionsPage() {
               icon={Clock}
               label="Proposed"
               value={counts.proposed}
-              hint="awaiting signoff"
+              hint="needs your review"
               accent="text-amber-600"
               accentBg="bg-amber-50"
             />
@@ -210,7 +210,7 @@ export default function DecisionsPage() {
               icon={CheckCircle2}
               label="Accepted"
               value={counts.accepted}
-              hint="signed off & locked"
+              hint="approved & carried forward"
               accent="text-emerald-600"
               accentBg="bg-emerald-50"
             />
@@ -218,7 +218,7 @@ export default function DecisionsPage() {
               icon={XCircle}
               label="Rejected"
               value={counts.rejected}
-              hint="resolved or deferred"
+              hint="decided against"
               accent="text-rose-600"
               accentBg="bg-rose-50"
             />
@@ -233,7 +233,7 @@ export default function DecisionsPage() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search rationale, anchor, ID…"
+                  placeholder="Search rationale, anchor, or decision ID…"
                   className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
@@ -271,7 +271,7 @@ export default function DecisionsPage() {
             {/* State chips */}
             <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
               <ListFilter className="h-3.5 w-3.5 text-slate-400" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">State</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Show me</span>
               {STATE_FILTERS.map((s) => {
                 const active = stateFilter === s.id
                 return (
@@ -304,9 +304,9 @@ export default function DecisionsPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <Search className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">No decisions match</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Try clearing a filter or widening the date range.
+                <p className="mt-3 text-sm font-semibold text-slate-900">No matches yet.</p>
+                <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
+                  Try clearing a filter, or check back as your team makes new decisions.
                 </p>
               </div>
             ) : (
@@ -317,8 +317,8 @@ export default function DecisionsPage() {
                     <Th>Rationale</Th>
                     <Th>Project · Part</Th>
                     <Th>Author</Th>
-                    <Th>Created</Th>
-                    <Th align="right">Action</Th>
+                    <Th>When</Th>
+                    <Th align="right">&nbsp;</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -369,7 +369,7 @@ export default function DecisionsPage() {
                           href={`/parts/${d.part_id}`}
                           className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100 hover:bg-primary-50"
                         >
-                          View
+                          Open
                           <ArrowUpRight className="h-3 w-3" />
                         </Link>
                       </td>

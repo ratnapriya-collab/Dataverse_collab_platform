@@ -13,10 +13,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowUpRight,
   CheckCircle2,
+  ChevronRight,
   Clock,
   FileCheck2,
+  FolderKanban,
+  Hash,
+  LayoutGrid,
   ListFilter,
   Search,
+  Table as TableIcon,
   XCircle,
 } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
@@ -32,6 +37,7 @@ import {
   SEED_PROJECTS,
   formatTimeAgo,
   type FullDecisionState,
+  type MockFullDecision,
 } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
@@ -70,6 +76,7 @@ export default function DecisionsPage() {
   const [projectFilter, setProjectFilter] = useState<string>('ALL')
   const [authorFilter, setAuthorFilter] = useState<string>('ALL')
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'feed' | 'table'>('feed')
 
   useEffect(() => {
     let cancelled = false
@@ -294,13 +301,49 @@ export default function DecisionsPage() {
               <span className="ml-auto text-xs text-slate-500">
                 <strong className="font-semibold text-slate-900">{filtered.length}</strong> matching
               </span>
+
+              {/* View toggle */}
+              <div
+                role="group"
+                aria-label="View mode"
+                className="ml-2 inline-flex overflow-hidden rounded-md border border-slate-200 bg-slate-50/60 p-0.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setView('feed')}
+                  aria-pressed={view === 'feed'}
+                  className={[
+                    'inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold transition',
+                    view === 'feed'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900',
+                  ].join(' ')}
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                  Feed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('table')}
+                  aria-pressed={view === 'table'}
+                  className={[
+                    'inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold transition',
+                    view === 'table'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900',
+                  ].join(' ')}
+                >
+                  <TableIcon className="h-3 w-3" />
+                  Table
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="dv-anim-fade-up mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ animationDelay: '220ms' }}>
+          {/* Results — Feed or Table */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '220ms' }}>
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <Search className="h-5 w-5" />
                 </div>
@@ -309,74 +352,10 @@ export default function DecisionsPage() {
                   Try clearing a filter, or check back as your team makes new decisions.
                 </p>
               </div>
+            ) : view === 'feed' ? (
+              <FeedView decisions={filtered} />
             ) : (
-              <table className="w-full">
-                <thead className="bg-slate-50/60">
-                  <tr className="text-left">
-                    <Th>State</Th>
-                    <Th>Rationale</Th>
-                    <Th>Project · Part</Th>
-                    <Th>Author</Th>
-                    <Th>When</Th>
-                    <Th align="right">&nbsp;</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((d) => (
-                    <tr key={d.id} className="group border-t border-slate-100 transition hover:bg-slate-50/50">
-                      <td className="px-4 py-3 align-top">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATE_PILL[d.state]}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${STATE_DOT[d.state]}`} />
-                          {d.state.toLowerCase()}
-                        </span>
-                      </td>
-                      <td className="max-w-md px-4 py-3 align-top">
-                        <p className="line-clamp-2 text-sm text-slate-700">{d.rationale}</p>
-                        <p className="mt-1 font-mono text-[10px] text-slate-400">
-                          {d.id} · {d.anchor_id}
-                          {d.citations.length > 0 && (
-                            <span className="ml-2 text-slate-500">{d.citations.join(' · ')}</span>
-                          )}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <Link
-                          href={`/parts/${d.part_id}`}
-                          className="text-sm font-medium text-slate-900 hover:text-primary hover:underline"
-                        >
-                          {d.part_name}
-                        </Link>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                          {d.project_name}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex items-center gap-2">
-                          <Avatar name={d.author_name} size="sm" />
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-slate-900">{d.author_name}</p>
-                            <TeamBadge team={d.author_team} size="xs" variant="dot" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500">
-                        {formatTimeAgo(d.created_at)}
-                      </td>
-                      <td className="px-4 py-3 align-top text-right">
-                        <Link
-                          href={`/parts/${d.part_id}`}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100 hover:bg-primary-50"
-                        >
-                          Open
-                          <ArrowUpRight className="h-3 w-3" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <TableView decisions={filtered} />
             )}
           </div>
         </section>
@@ -394,5 +373,221 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
     >
       {children}
     </th>
+  )
+}
+
+// ── Feed view (big cards) ───────────────────────────────────────────────────
+
+const STATE_STRIP: Record<FullDecisionState, string> = {
+  DRAFT: 'bg-slate-300',
+  PROPOSED: 'bg-gradient-to-b from-amber-400 to-amber-500',
+  ACCEPTED: 'bg-gradient-to-b from-emerald-400 to-emerald-600',
+  REJECTED: 'bg-gradient-to-b from-rose-400 to-rose-600',
+  SUPERSEDED: 'bg-slate-300',
+}
+
+function FeedView({ decisions }: { decisions: MockFullDecision[] }) {
+  return (
+    <ul className="space-y-3">
+      {decisions.map((d, i) => (
+        <li
+          key={d.id}
+          className="dv-anim-fade-up"
+          style={{ animationDelay: `${Math.min(i * 35, 280)}ms`, animationFillMode: 'backwards' }}
+        >
+          <DecisionFeedCard decision={d} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function DecisionFeedCard({ decision: d }: { decision: MockFullDecision }) {
+  const pct =
+    d.signoff_progress !== undefined && d.signoff_progress.total > 0
+      ? Math.round((d.signoff_progress.responded / d.signoff_progress.total) * 100)
+      : null
+  const isPending = d.state === 'PROPOSED'
+
+  return (
+    <article className="group relative flex gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      {/* Left state strip */}
+      <div className={`w-1 shrink-0 self-stretch rounded-full ${STATE_STRIP[d.state]}`} aria-hidden="true" />
+
+      <div className="min-w-0 flex-1">
+        {/* Top row: state · ID · time */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATE_PILL[d.state]}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${STATE_DOT[d.state]}`} />
+            {d.state.toLowerCase()}
+          </span>
+          <span className="font-mono text-[10px] text-slate-400">{d.id}</span>
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-slate-500">
+            <Clock className="h-3 w-3" />
+            {formatTimeAgo(d.created_at)}
+          </span>
+        </div>
+
+        {/* Breadcrumb: project › part · anchor */}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <FolderKanban className="h-3 w-3 text-slate-400" />
+          <Link
+            href={`/workspace`}
+            className="text-slate-600 hover:text-primary hover:underline"
+          >
+            {d.project_name}
+          </Link>
+          <ChevronRight className="h-3 w-3 text-slate-300" />
+          <Link
+            href={`/parts/${d.part_id}`}
+            className="font-semibold text-slate-900 hover:text-primary hover:underline"
+          >
+            {d.part_name}
+          </Link>
+          <span className="ml-1 inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-700">
+            <Hash className="h-2.5 w-2.5 text-slate-500" />
+            {d.anchor_id}
+          </span>
+        </div>
+
+        {/* Rationale */}
+        <p className="mt-3 text-[13px] leading-relaxed text-slate-800">{d.rationale}</p>
+
+        {/* Citations */}
+        {d.citations.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {d.citations.map((c) => (
+              <span
+                key={c}
+                className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-700"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Footer: author + signoff + open */}
+        <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+          <div className="flex items-center gap-2.5">
+            <Avatar name={d.author_name} size="sm" />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-900">{d.author_name}</p>
+              <TeamBadge team={d.author_team} size="xs" variant="dot" />
+            </div>
+          </div>
+
+          {pct !== null && (
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <span>
+                <strong className="font-semibold tabular-nums text-slate-900">
+                  {d.signoff_progress!.responded}/{d.signoff_progress!.total}
+                </strong>{' '}
+                signed
+              </span>
+              <div className="h-1 w-20 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full transition-all ${
+                    pct === 100 ? 'bg-emerald-500' : 'bg-primary'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            {isPending && (
+              <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-amber-600 sm:inline">
+                Awaits review
+              </span>
+            )}
+            <Link
+              href={`/parts/${d.part_id}`}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm transition group-hover:border-primary group-hover:bg-primary group-hover:text-white"
+            >
+              Open in viewer
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </footer>
+      </div>
+    </article>
+  )
+}
+
+// ── Table view (compact, dense) ─────────────────────────────────────────────
+
+function TableView({ decisions }: { decisions: MockFullDecision[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table className="w-full">
+        <thead className="bg-slate-50/60">
+          <tr className="text-left">
+            <Th>State</Th>
+            <Th>Rationale</Th>
+            <Th>Project · Part</Th>
+            <Th>Author</Th>
+            <Th>When</Th>
+            <Th align="right">&nbsp;</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {decisions.map((d) => (
+            <tr key={d.id} className="group border-t border-slate-100 transition hover:bg-slate-50/50">
+              <td className="px-4 py-3 align-top">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATE_PILL[d.state]}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${STATE_DOT[d.state]}`} />
+                  {d.state.toLowerCase()}
+                </span>
+              </td>
+              <td className="max-w-md px-4 py-3 align-top">
+                <p className="line-clamp-2 text-sm text-slate-700">{d.rationale}</p>
+                <p className="mt-1 font-mono text-[10px] text-slate-400">
+                  {d.id} · {d.anchor_id}
+                  {d.citations.length > 0 && (
+                    <span className="ml-2 text-slate-500">{d.citations.join(' · ')}</span>
+                  )}
+                </p>
+              </td>
+              <td className="px-4 py-3 align-top">
+                <Link
+                  href={`/parts/${d.part_id}`}
+                  className="text-sm font-medium text-slate-900 hover:text-primary hover:underline"
+                >
+                  {d.part_name}
+                </Link>
+                <p className="mt-0.5 truncate text-[11px] text-slate-500">{d.project_name}</p>
+              </td>
+              <td className="px-4 py-3 align-top">
+                <div className="flex items-center gap-2">
+                  <Avatar name={d.author_name} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-slate-900">{d.author_name}</p>
+                    <TeamBadge team={d.author_team} size="xs" variant="dot" />
+                  </div>
+                </div>
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500">
+                {formatTimeAgo(d.created_at)}
+              </td>
+              <td className="px-4 py-3 align-top text-right">
+                <Link
+                  href={`/parts/${d.part_id}`}
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100 hover:bg-primary-50"
+                >
+                  Open
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

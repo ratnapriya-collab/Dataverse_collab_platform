@@ -9,10 +9,9 @@
  */
 
 import { useRouter } from 'next/navigation'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Download,
   FileText,
@@ -23,6 +22,7 @@ import {
   MessageSquare,
   Send,
   Shield,
+  Sparkles,
   Upload,
   UserPlus,
   XCircle,
@@ -400,10 +400,10 @@ export default function AuditPage() {
             </span>
           </div>
 
-          {/* Table */}
-          <div className="dv-anim-fade-up mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ animationDelay: '220ms' }}>
+          {/* Vertical timeline (day-grouped) */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '220ms' }}>
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <Inbox className="h-5 w-5" />
                 </div>
@@ -413,90 +413,11 @@ export default function AuditPage() {
                 </p>
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-slate-50/60">
-                  <tr className="text-left">
-                    <Th>&nbsp;</Th>
-                    <Th>When</Th>
-                    <Th>What happened</Th>
-                    <Th>Who</Th>
-                    <Th>On</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((ev) => {
-                    const s = KIND_STYLE[ev.kind]
-                    const Icon = s.icon
-                    const open = expanded.has(ev.id)
-                    return (
-                      <Fragment key={ev.id}>
-                        <tr
-                          onClick={() => toggle(ev.id)}
-                          className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50/50"
-                        >
-                          <td className="px-3 py-3">
-                            <span className="inline-flex h-5 w-5 items-center justify-center text-slate-400">
-                              {open ? (
-                                <ChevronDown className="h-3 w-3" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3" />
-                              )}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3">
-                            <p className="font-mono text-xs text-slate-700">
-                              {new Date(ev.created_at).toISOString().slice(0, 16).replace('T', ' ')}
-                            </p>
-                            <p className="mt-0.5 text-[10px] text-slate-400">
-                              {formatTimeAgo(ev.created_at)}
-                            </p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold ${s.bg} ${s.fg}`}>
-                              <Icon className="h-3 w-3" />
-                              {s.label}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <Avatar name={ev.actor_name} size="sm" />
-                              <span className="text-xs font-medium text-slate-700">{ev.actor_name}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="font-mono text-xs text-slate-900">{ev.target}</span>
-                          </td>
-                        </tr>
-                        {open && (
-                          <tr className="border-t border-slate-100 bg-slate-50/60">
-                            <td colSpan={5} className="px-12 py-3">
-                              <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                                  Raw payload · exactly what was logged
-                                </p>
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-200/60"
-                                >
-                                  <FileText className="h-3 w-3" />
-                                  Copy as JSON
-                                </button>
-                              </div>
-                              <pre className="mt-1 overflow-x-auto rounded-md border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
-{JSON.stringify(
-  { id: ev.id, kind: ev.kind, actor: ev.actor_name, target: ev.target, at: ev.created_at, ...ev.payload },
-  null,
-  2,
-)}
-                              </pre>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <Timeline
+                groups={groupByDay(filtered)}
+                expanded={expanded}
+                onToggle={toggle}
+              />
             )}
           </div>
         </section>
@@ -505,10 +426,192 @@ export default function AuditPage() {
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+// ── Timeline render ─────────────────────────────────────────────────────────
+
+interface DayGroup {
+  /** ISO date key, e.g. "2026-05-14" */
+  key: string
+  /** Display label, e.g. "Today" / "Yesterday" / "Mon, May 12" */
+  label: string
+  events: AuditRow[]
+}
+
+const TODAY_KEY = new Date('2026-05-14T00:00:00Z').toISOString().slice(0, 10)
+const YESTERDAY_KEY = new Date(new Date('2026-05-14T00:00:00Z').getTime() - 86_400_000)
+  .toISOString()
+  .slice(0, 10)
+
+function groupByDay(events: AuditRow[]): DayGroup[] {
+  const buckets = new Map<string, AuditRow[]>()
+  for (const ev of events) {
+    const key = new Date(ev.created_at).toISOString().slice(0, 10)
+    const arr = buckets.get(key) ?? []
+    arr.push(ev)
+    buckets.set(key, arr)
+  }
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([key, evs]) => ({
+      key,
+      label:
+        key === TODAY_KEY
+          ? 'Today'
+          : key === YESTERDAY_KEY
+          ? 'Yesterday'
+          : new Date(key + 'T00:00:00Z').toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            }),
+      events: evs,
+    }))
+}
+
+function Timeline({
+  groups,
+  expanded,
+  onToggle,
+}: {
+  groups: DayGroup[]
+  expanded: Set<string>
+  onToggle: (id: string) => void
+}) {
   return (
-    <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-      {children}
-    </th>
+    <div className="relative">
+      {/* Continuous spine running the full height — anchored 20px from the left */}
+      <span
+        aria-hidden="true"
+        className="absolute left-5 top-4 bottom-4 w-px bg-gradient-to-b from-slate-200 via-slate-200 to-transparent"
+      />
+
+      <div className="space-y-8">
+        {groups.map((group, gi) => (
+          <section
+            key={group.key}
+            className="dv-anim-fade-up relative"
+            style={{ animationDelay: `${Math.min(gi * 60, 240)}ms`, animationFillMode: 'backwards' }}
+          >
+            {/* Sticky day header */}
+            <div className="sticky top-12 z-20 mb-3 -ml-1 flex items-center gap-3 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-50/70 py-2 backdrop-blur-sm">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                {group.label === 'Today' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />}
+                {group.label}
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {group.events.length} event{group.events.length === 1 ? '' : 's'}
+              </span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            {/* Events for this day */}
+            <ul className="space-y-2.5">
+              {group.events.map((ev) => {
+                const s = KIND_STYLE[ev.kind]
+                const Icon = s.icon
+                const open = expanded.has(ev.id)
+                const dotBg = DOT_BG[ev.kind]
+                return (
+                  <li key={ev.id} className="relative pl-12">
+                    {/* Node on the spine */}
+                    <span
+                      className={`absolute left-[10px] top-3 z-10 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-slate-50 ${dotBg}`}
+                      aria-hidden="true"
+                    >
+                      <Icon className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                    </span>
+
+                    {/* Event card */}
+                    <article
+                      onClick={() => onToggle(ev.id)}
+                      className={`group cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-px hover:border-slate-300 hover:shadow-md ${
+                        open ? 'ring-2 ring-primary/15' : ''
+                      }`}
+                    >
+                      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${s.bg} ${s.fg}`}>
+                          {s.label}
+                        </span>
+                        <span className="font-mono text-xs font-semibold text-slate-900 truncate">
+                          {ev.target}
+                        </span>
+                        <span className="ml-auto flex items-center gap-2 text-[11px]">
+                          <Avatar name={ev.actor_name} size="sm" />
+                          <span className="font-medium text-slate-700">{ev.actor_name}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-slate-500">{formatTimeAgo(ev.created_at)}</span>
+                          <ChevronRight
+                            className={`h-3 w-3 text-slate-400 transition-transform ${open ? 'rotate-90 text-primary' : 'group-hover:translate-x-0.5'}`}
+                          />
+                        </span>
+                      </header>
+
+                      {/* Expanded payload */}
+                      {open && (
+                        <div
+                          className="dv-anim-fade-in border-t border-slate-200 bg-slate-50/70 px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                              <Sparkles className="h-3 w-3 text-primary" />
+                              Raw payload · exactly what was logged
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                  void navigator.clipboard.writeText(
+                                    JSON.stringify(
+                                      { id: ev.id, kind: ev.kind, actor: ev.actor_name, target: ev.target, at: ev.created_at, ...ev.payload },
+                                      null,
+                                      2,
+                                    ),
+                                  )
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-200/60"
+                            >
+                              <FileText className="h-3 w-3" />
+                              Copy as JSON
+                            </button>
+                          </div>
+                          <pre className="mt-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
+{JSON.stringify(
+  { id: ev.id, kind: ev.kind, actor: ev.actor_name, target: ev.target, at: ev.created_at, ...ev.payload },
+  null,
+  2,
+)}
+                          </pre>
+                          <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                            <span className="font-mono">
+                              {new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')} UTC
+                            </span>
+                            <span>immutable · cannot be edited or deleted</span>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
   )
+}
+
+/** Solid dot background per event kind — used for the colored node on the spine. */
+const DOT_BG: Record<AuditEventKind, string> = {
+  PART_UPLOADED: 'bg-violet-500',
+  REV_UPLOADED: 'bg-violet-600',
+  COMMENT_CREATED: 'bg-amber-500',
+  COMMENT_ACCEPTED: 'bg-emerald-500',
+  COMMENT_REJECTED: 'bg-rose-500',
+  MEMBER_JOINED: 'bg-primary',
+  INVITE_CREATED: 'bg-brand-600',
+  RESOLVER_COMPLETED: 'bg-slate-600',
+  PLM_PUSHED: 'bg-amber-600',
+  DECISION_SUPERSEDED: 'bg-amber-500',
 }

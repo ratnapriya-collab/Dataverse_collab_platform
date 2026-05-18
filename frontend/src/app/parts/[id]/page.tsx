@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
@@ -9,6 +9,10 @@ import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import CreateDecisionModal from '@/components/decisions/CreateDecisionModal'
 import DecisionsPanel from '@/components/decisions/DecisionsPanel'
+import RoleSwitcher, { type ViewRole } from '@/components/redaction/RoleSwitcher'
+import PartnerViewBanner from '@/components/redaction/PartnerViewBanner'
+import RedactedDecisionCard from '@/components/redaction/RedactedDecisionCard'
+import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplainer'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import type {
@@ -63,12 +67,45 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max - 1).trimEnd() + '…'
 }
 
+// ── Partner-view redaction heuristic ────────────────────────────────────────
+
+/**
+ * Stable demo rule for "is this decision internal-only?":
+ *   • DRAFT state         → internal-flag
+ *   • Cost-y keywords     → cost-keyword
+ *   • Every 4th by hash   → admin-only-thread
+ *
+ * Real product would lean on an explicit visibility column. The heuristic
+ * keeps the demo deterministic against the live backend.
+ */
+type RedactionReason = 'internal-flag' | 'cost-keyword' | 'admin-only-thread'
+
+function redactionReason(d: DecisionRead): RedactionReason | null {
+  if (d.state === 'DRAFT') return 'internal-flag'
+  if (/(\bcost\b|\bmargin\b|\bquote\b|\bsupplier\s+rate\b|\bpricing\b|\binternal\b)/i.test(d.rationale)) {
+    return 'cost-keyword'
+  }
+  // Hash the id so every 4th decision is "admin-only-thread" — adds variety
+  // even on a workspace with only ACCEPTED decisions.
+  let h = 0
+  for (let i = 0; i < d.id.length; i++) h = (h * 31 + d.id.charCodeAt(i)) | 0
+  if (Math.abs(h) % 4 === 0) return 'admin-only-thread'
+  return null
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function PartPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const partId = params?.id
+
+  // Partner-view state — driven by ?view=<role>
+  const viewParam = (searchParams?.get('view') ?? 'admin') as ViewRole
+  const activeRole: ViewRole = viewParam === 'partner' ? 'partner' : viewParam === 'oem' ? 'oem' : 'admin'
+  const isPartner = activeRole === 'partner'
+  const [showWhatsHidden, setShowWhatsHidden] = useState(false)
 
   const [user, setUser] = useState<UserRead | null>(null)
   const [part, setPart] = useState<PartDetail | null>(null)
@@ -128,12 +165,32 @@ export default function PartPage() {
     setDecisions((prev) => prev.map((x) => (x.id === d.id ? d : x)))
   }, [])
 
+  // Partition decisions by redaction policy when in partner view.
+  const { visibleDecisions, redactedDecisions } = useMemo(() => {
+    if (!isPartner) return { visibleDecisions: decisions, redactedDecisions: [] as DecisionRead[] }
+    const visible: DecisionRead[] = []
+    const redacted: DecisionRead[] = []
+    for (const d of decisions) {
+      if (redactionReason(d) !== null) redacted.push(d)
+      else visible.push(d)
+    }
+    return { visibleDecisions: visible, redactedDecisions: redacted }
+  }, [decisions, isPartner])
+
+  // Comments redacted by Datum — a counter for the banner copy (real product
+  // would deep-comment-scan; here we just attribute 2 redacted comments per
+  // hidden decision so the banner shows realistic numbers).
+  const hiddenCommentsCount = redactedDecisions.length * 2
+
+  // Decisions actually used to build labels + the side panel.
+  const labelSourceDecisions = isPartner && !showWhatsHidden ? visibleDecisions : decisions
+
   // Derive the SVG/HTML callout list directly from decisions. Anchors
   // without comments are intentionally NOT rendered — the user's mental
   // model is "a pin = a comment", not "a pin = a click history".
   const labels = useMemo<LabeledMarker[]>(() => {
     const byFace = new Map<string, { decisions: DecisionRead[]; centroid: Centroid }>()
-    for (const d of decisions) {
+    for (const d of labelSourceDecisions) {
       if (d.anchor === null) continue
       const existing = byFace.get(d.anchor.face_uuid)
       if (existing) {
@@ -179,7 +236,7 @@ export default function PartPage() {
       })
     }
     return labelList
-  }, [decisions])
+  }, [labelSourceDecisions])
 
   function handleSignOut(): void {
     clearToken()
@@ -239,6 +296,8 @@ export default function PartPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <RoleSwitcher active={activeRole} />
+            <span className="hidden h-5 w-px bg-slate-200 sm:inline-block" aria-hidden="true" />
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"
@@ -250,6 +309,19 @@ export default function PartPage() {
           </div>
         </div>
       </header>
+
+      {/* Partner-view banner — admin previewing as supplier */}
+      {isPartner && (
+        <PartnerViewBanner
+          partnerName="Sarah Chen"
+          partnerOrg="Supplier Reviewer · Acme Manufacturing"
+          hiddenDecisions={redactedDecisions.length}
+          hiddenComments={hiddenCommentsCount}
+          showWhatsHidden={showWhatsHidden}
+          onToggleShow={() => setShowWhatsHidden((v) => !v)}
+          partPath={`/parts/${partId ?? ''}`}
+        />
+      )}
 
       <section className="grid flex-1 grid-cols-[1fr_360px] overflow-hidden">
         <div className="relative bg-slate-100">
@@ -308,8 +380,41 @@ export default function PartPage() {
 
           <hr className="my-5 border-slate-200" />
 
+          {/* Partner-view redaction layer — only when previewing as supplier */}
+          {isPartner && (
+            <div className="mb-5 space-y-3">
+              <DatumRedactionExplainer
+                hiddenDecisions={redactedDecisions.length}
+                hiddenComments={hiddenCommentsCount}
+              />
+              {redactedDecisions.length > 0 && (
+                <div>
+                  <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+                    Hidden by Datum ({redactedDecisions.length})
+                  </div>
+                  <div className="space-y-2">
+                    {redactedDecisions.map((d) => {
+                      const reason = redactionReason(d) ?? 'internal-flag'
+                      return (
+                        <RedactedDecisionCard
+                          key={d.id}
+                          decisionId={d.id}
+                          reason={reason}
+                          showWhatsHidden={showWhatsHidden}
+                          hiddenRationale={d.rationale}
+                          hiddenAuthorName={d.author?.name}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <DecisionsPanel
-            decisions={decisions}
+            decisions={isPartner ? visibleDecisions : decisions}
             onChanged={handleDecisionChanged}
             highlightedFaceUuid={hoveredFaceUuid}
             onHoverDecision={setHoveredFaceUuid}

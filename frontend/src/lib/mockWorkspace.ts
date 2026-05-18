@@ -1208,6 +1208,55 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   orphaned: [],
 }
 
+// ── PLM connection + ECN mocks (used by /parts/[id]/plm-push) ────────────────
+
+export type PlmConnectionStatus = 'connected' | 'syncing' | 'error' | 'disconnected'
+
+export interface MockPlmConnection {
+  vendor: 'Windchill' | 'Teamcenter' | 'Aras'
+  version: string
+  host: string
+  status: PlmConnectionStatus
+  /** ISO timestamps — null means never. */
+  last_pulled_at: string | null
+  last_pushed_at: string | null
+}
+
+export const SEED_PLM_CONNECTION: MockPlmConnection = {
+  vendor: 'Windchill',
+  version: '12.1',
+  host: 'acme-corp.windchill.com',
+  status: 'connected',
+  last_pulled_at: new Date(NOW - 2 * 3_600_000).toISOString(),
+  last_pushed_at: null,
+}
+
+export interface MockEcnAttachment {
+  name: string
+  size_bytes: number
+  signed?: boolean
+}
+
+export interface MockEcnTemplate {
+  /** Draft ID — PLM assigns a real ID after submission. */
+  draft_id: string
+  title: string
+  classification: 'Class I' | 'Class II' | 'Class III'
+  affected_part: string
+  attachments: MockEcnAttachment[]
+}
+
+export const SEED_ECN_TEMPLATE: MockEcnTemplate = {
+  draft_id: 'ECN-2026-DRAFT-0418',
+  title: 'Wing Spar Bracket Assembly · Rev B Engineering Changes',
+  classification: 'Class II',
+  affected_part: 'Wing Spar Bracket Assembly · Rev B',
+  attachments: [
+    { name: 'ecn-2026-0418.pdf', size_bytes: 1_258_291 },
+    { name: 'audit-bundle.dvex.json', size_bytes: 847_360, signed: true },
+  ],
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Replace the placeholder "You" member with the signed-in user's real info. */

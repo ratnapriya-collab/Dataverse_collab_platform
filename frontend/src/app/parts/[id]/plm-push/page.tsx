@@ -1,11 +1,16 @@
 'use client'
 
 /**
- * /parts/[id]/plm-push — Push to PLM (Screen A.10).
+ * /parts/[id]/plm-push — M9 PLM Adapter (push to Windchill).
  *
- * Mock Windchill push flow. Picks ready-to-push ACCEPTED decisions,
- * shows an ECN assignment preview, fakes a progress modal, then a
- * success toast with a faux Windchill link.
+ * Three-column wizard:
+ *   Left   — picker: ACCEPTED decisions to include (pre-checked)
+ *   Center — ECN preview generated from selection
+ *   Right  — live sync status + "what gets pushed" explainer
+ *
+ * Bottom action bar fires the PushToPLMModal which animates a 3-phase
+ * push then reveals download buttons + a deep-link to the external
+ * Windchill view of the assigned ECN.
  */
 
 import Link from 'next/link'
@@ -13,47 +18,32 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
-  Check,
   CheckCircle2,
-  Clock,
-  Download,
-  ExternalLink,
+  ChevronRight,
+  Hash,
   Send,
   ServerCog,
-  Sparkles,
 } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
-import StatCard from '@/components/workspace/StatCard'
-import TeamBadge from '@/components/workspace/TeamBadge'
 import Avatar from '@/components/workspace/Avatar'
+import TeamBadge from '@/components/workspace/TeamBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
+import SyncStatusCard from '@/components/plm/SyncStatusCard'
+import ECNPreviewCard from '@/components/plm/ECNPreviewCard'
+import PushToPLMModal from '@/components/plm/PushToPLMModal'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import {
+  SEED_ECN_TEMPLATE,
   SEED_FULL_DECISIONS,
+  SEED_PLM_CONNECTION,
   formatTimeAgo,
+  type MockFullDecision,
 } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
-const NOW = new Date('2026-05-14T12:00:00Z').getTime()
-
-const SYNC_STATE = {
-  last_pulled: new Date(NOW - 2 * 3_600_000).toISOString(),
-  last_pushed: null as string | null,
-  pending: 3,
-  target: 'Windchill 12.1',
-}
-
-type Phase = 'idle' | 'pushing-1' | 'pushing-2' | 'pushing-3' | 'success'
-
-const PHASES: Array<{ id: Phase; label: string; durationMs: number }> = [
-  { id: 'pushing-1', label: 'Locking decisions in DataVerse…', durationMs: 700 },
-  { id: 'pushing-2', label: 'Generating ECN payload (PLM-compatible)…', durationMs: 800 },
-  { id: 'pushing-3', label: 'Posting to Windchill 12.1 → workflow #4711…', durationMs: 1100 },
-]
-
-export default function PlmPushPage() {
+export default function PlmPushPage(): JSX.Element {
   const params = useParams<{ id: string }>()
   const partId = params?.id ?? 'demo_part'
   const router = useRouter()
@@ -61,9 +51,18 @@ export default function PlmPushPage() {
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 
-  const [phase, setPhase] = useState<Phase>('idle')
-  const [ecnId, setEcnId] = useState<string | null>(null)
-  const [lastPushed, setLastPushed] = useState<string | null>(SYNC_STATE.last_pushed)
+  // ACCEPTED decisions on this part (use first 3 if no exact match).
+  const eligible = useMemo<MockFullDecision[]>(() => {
+    const onPart = SEED_FULL_DECISIONS.filter((d) => d.state === 'ACCEPTED' && d.part_id === partId)
+    return onPart.length > 0 ? onPart.slice(0, 3) : SEED_FULL_DECISIONS.filter((d) => d.state === 'ACCEPTED').slice(0, 3)
+  }, [partId])
+
+  // Pre-check all eligible decisions.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(eligible.map((d) => d.id)))
+  const [pushTrigger, setPushTrigger] = useState(0)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [pushedEcnId, setPushedEcnId] = useState<string | null>(null)
+  const [pushedAt, setPushedAt] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -91,35 +90,38 @@ export default function PlmPushPage() {
     router.replace('/login')
   }
 
-  // Pick the 3 most-recent ACCEPTED decisions as "ready to push".
-  const readyToPush = useMemo(
-    () =>
-      SEED_FULL_DECISIONS.filter((d) => d.state === 'ACCEPTED')
-        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-        .slice(0, 3),
-    [],
+  const selectedDecisions = useMemo(
+    () => eligible.filter((d) => selectedIds.has(d.id)),
+    [eligible, selectedIds],
   )
 
-  function handlePush(): void {
-    if (phase !== 'idle') return
-    let elapsed = 0
-    for (const p of PHASES) {
-      const at = elapsed
-      window.setTimeout(() => setPhase(p.id), at)
-      elapsed += p.durationMs
-    }
-    window.setTimeout(() => {
-      const newEcn = `ECN-2026-${String(Math.floor(Math.random() * 900 + 100))}`
-      setEcnId(newEcn)
-      setPhase('success')
-      setLastPushed(new Date().toISOString())
-      setToast({ message: `${newEcn} created in Windchill`, tone: 'success' })
-    }, elapsed)
+  function toggle(id: string): void {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  function reset(): void {
-    setPhase('idle')
-    setEcnId(null)
+  function toggleAll(): void {
+    if (selectedIds.size === eligible.length) setSelectedIds(new Set())
+    else setSelectedIds(new Set(eligible.map((d) => d.id)))
+  }
+
+  function handlePush(): void {
+    if (selectedDecisions.length === 0) {
+      setToast({ message: 'Select at least one decision to push', tone: 'error' })
+      return
+    }
+    setModalOpen(true)
+    setPushTrigger((n) => n + 1)
+  }
+
+  function handlePushComplete(ecnId: string): void {
+    setPushedEcnId(ecnId)
+    setPushedAt(new Date().toISOString())
+    setToast({ message: `${ecnId} created in Windchill`, tone: 'success' })
   }
 
   if (error !== null) {
@@ -131,7 +133,6 @@ export default function PlmPushPage() {
       </main>
     )
   }
-
   if (user === null) {
     return (
       <main className="flex min-h-screen items-center justify-center text-slate-500">
@@ -140,7 +141,7 @@ export default function PlmPushPage() {
     )
   }
 
-  const isPushing = phase !== 'idle' && phase !== 'success'
+  const allSelected = selectedIds.size === eligible.length && eligible.length > 0
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -149,6 +150,7 @@ export default function PlmPushPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Toast toast={toast} onClose={() => setToast(null)} />
 
+        {/* Breadcrumb header */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <ServerCog className="h-3 w-3 text-primary" />
@@ -163,8 +165,8 @@ export default function PlmPushPage() {
           <NotificationsBell />
         </header>
 
-        <section className="mx-auto w-full max-w-6xl px-6 py-8">
-          {/* Hero */}
+        <section className="mx-auto w-full max-w-[1280px] px-6 py-8">
+          {/* ── Hero ───────────────────────────────────────────────────── */}
           <div className="dv-anim-fade-up relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 p-6 text-white shadow-lg">
             <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-brand opacity-25 blur-3xl" />
             <div className="pointer-events-none absolute -left-10 -bottom-10 h-60 w-60 rounded-full bg-primary opacity-30 blur-3xl" />
@@ -180,13 +182,14 @@ export default function PlmPushPage() {
                 <ServerCog className="h-7 w-7 text-brand-300" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
                   <Send className="h-3 w-3" />
-                  PLM integration · {SYNC_STATE.target}
+                  PLM integration · {SEED_PLM_CONNECTION.vendor} {SEED_PLM_CONNECTION.version}
                 </div>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight">Push decisions to PLM</h1>
-                <p className="mt-1 text-sm leading-relaxed text-white/70">
-                  Generate an ECN containing all locked decisions on this part. The payload is PLM-compatible JSON and lands in your Windchill workflow queue.
+                <p className="mt-1 text-sm leading-relaxed text-white/75">
+                  Pick the ACCEPTED decisions to include, review the auto-generated ECN, then push. The
+                  signed audit bundle goes along for the ride.
                 </p>
               </div>
               <Link
@@ -199,257 +202,152 @@ export default function PlmPushPage() {
             </div>
           </div>
 
-          {/* Sync state stats */}
-          <div className="dv-anim-fade-up mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" style={{ animationDelay: '80ms' }}>
-            <StatCard
-              icon={Download}
-              label="Last pulled"
-              value={formatTimeAgo(SYNC_STATE.last_pulled)}
-              hint={SYNC_STATE.target}
-              accent="text-primary"
-              accentBg="bg-primary-50"
-            />
-            <StatCard
-              icon={Send}
-              label="Last pushed"
-              value={lastPushed !== null ? formatTimeAgo(lastPushed) : 'Never'}
-              hint={lastPushed !== null ? ecnId ?? '—' : 'no prior pushes for this part'}
-              accent="text-emerald-600"
-              accentBg="bg-emerald-50"
-            />
-            <StatCard
-              icon={Clock}
-              label="Ready to push"
-              value={readyToPush.length}
-              hint="accepted decisions"
-              accent="text-amber-600"
-              accentBg="bg-amber-50"
-            />
-            <StatCard
-              icon={ServerCog}
-              label="Target system"
-              value="Windchill 12.1"
-              hint="prod · us-east-1"
-              accent="text-brand-700"
-              accentBg="bg-brand-50"
-            />
-          </div>
-
-          {/* Preview table */}
-          <div className="dv-anim-fade-up mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ animationDelay: '150ms' }}>
-            <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-900">Will be included in the ECN</h2>
-                <p className="text-xs text-slate-500">
-                  {readyToPush.length} decisions · grouped under a single Engineering Change Notice
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handlePush}
-                disabled={isPushing}
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isPushing ? (
-                  <>
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-r-transparent" />
-                    Pushing…
-                  </>
+          {/* ── 3-column wizard ────────────────────────────────────────── */}
+          <div className="dv-anim-fade-up mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_320px]" style={{ animationDelay: '80ms' }}>
+            {/* Left column · Decisions ready to push */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <header className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Decisions to push
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-[10px] font-semibold uppercase tracking-wider text-primary hover:underline"
+                >
+                  {allSelected ? 'Clear' : 'Select all'}
+                </button>
+              </header>
+              <ul className="divide-y divide-slate-100">
+                {eligible.length === 0 ? (
+                  <li className="px-4 py-6 text-center text-xs text-slate-500">
+                    No ACCEPTED decisions yet on this part.
+                  </li>
                 ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" />
-                    Push to Windchill
-                  </>
+                  eligible.map((d) => {
+                    const checked = selectedIds.has(d.id)
+                    return (
+                      <li key={d.id}>
+                        <label
+                          className={`flex w-full cursor-pointer items-start gap-2.5 px-4 py-3 transition ${
+                            checked ? 'bg-primary-50/40 hover:bg-primary-50/60' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggle(d.id)}
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-slate-300 text-primary focus:ring-primary"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">
+                                <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                                Accepted
+                              </span>
+                              <span className="font-mono text-[10px] text-slate-400">{d.id}</span>
+                            </div>
+                            <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-slate-700">
+                              {d.rationale}
+                            </p>
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500">
+                              <Hash className="h-2.5 w-2.5" />
+                              <span className="font-mono">{d.anchor_id}</span>
+                            </div>
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <Avatar name={d.author_name} size="sm" />
+                              <span className="truncate text-[10px] font-medium text-slate-700">
+                                {d.author_name}
+                              </span>
+                              <TeamBadge team={d.author_team} size="xs" variant="dot" />
+                              <span className="ml-auto whitespace-nowrap text-[10px] text-slate-400">
+                                {formatTimeAgo(d.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                      </li>
+                    )
+                  })
                 )}
-              </button>
-            </header>
-            <table className="w-full">
-              <thead className="bg-slate-50/60">
-                <tr className="text-left">
-                  <Th>Decision</Th>
-                  <Th>Rationale</Th>
-                  <Th>Anchor</Th>
-                  <Th>Author</Th>
-                  <Th>Created</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {readyToPush.map((d) => (
-                  <tr key={d.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 align-top">
-                      <p className="font-mono text-xs font-semibold text-slate-900">{d.id}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-500">{d.project_name}</p>
-                    </td>
-                    <td className="max-w-md px-4 py-3 align-top">
-                      <p className="line-clamp-2 text-sm text-slate-700">{d.rationale}</p>
-                      {d.citations.length > 0 && (
-                        <p className="mt-1 truncate font-mono text-[10px] text-slate-500">
-                          {d.citations.join(' · ')}
-                        </p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 align-top">
-                      <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-700">
-                        {d.anchor_id}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={d.author_name} size="sm" />
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-slate-900">{d.author_name}</p>
-                          <TeamBadge team={d.author_team} size="xs" variant="dot" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500">
-                      {formatTimeAgo(d.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              </ul>
+              <footer className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-[10px] text-slate-500">
+                <strong className="font-bold tabular-nums text-slate-900">{selectedIds.size}</strong>{' '}
+                of {eligible.length} selected
+              </footer>
+            </div>
+
+            {/* Center column · ECN preview */}
+            <ECNPreviewCard template={SEED_ECN_TEMPLATE} selectedDecisions={selectedDecisions} />
+
+            {/* Right column · Sync + explainer */}
+            <SyncStatusCard
+              connection={SEED_PLM_CONNECTION}
+              lastPushedAt={pushedAt}
+              lastEcnId={pushedEcnId}
+              onPing={() => setToast({ message: 'Connection healthy · 42 ms', tone: 'success' })}
+            />
           </div>
 
-          {/* JSON payload preview (collapsed by default) */}
-          <details className="dv-anim-fade-up mt-4 rounded-xl border border-slate-200 bg-white shadow-sm" style={{ animationDelay: '220ms' }}>
-            <summary className="flex cursor-pointer items-center justify-between px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <span className="inline-flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                Preview ECN payload (PLM-compatible JSON)
-              </span>
-              <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                {readyToPush.length} decisions · ~{readyToPush.length * 1.2} KB
-              </span>
-            </summary>
-            <pre className="overflow-x-auto border-t border-slate-100 bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">
-{JSON.stringify(
-  {
-    ecn_id: ecnId ?? 'ECN-<assigned-on-push>',
-    target_system: 'Windchill 12.1',
-    workflow: '#4711 — Engineering Change',
-    part_id: partId,
-    decisions: readyToPush.map((d) => ({
-      id: d.id,
-      anchor_id: d.anchor_id,
-      state: d.state,
-      rationale: d.rationale,
-      citations: d.citations,
-      author: d.author_name,
-      created_at: d.created_at,
-    })),
-  },
-  null,
-  2,
-)}
-            </pre>
-          </details>
+          {/* ── Bottom action bar ──────────────────────────────────────── */}
+          <footer className="dv-anim-fade-up sticky bottom-4 z-20 mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-md" style={{ animationDelay: '160ms' }}>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {pushedEcnId === null
+                  ? 'Ready to push to Windchill'
+                  : `Pushed · ${pushedEcnId}`}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {pushedEcnId === null
+                  ? `${selectedDecisions.length} decisions · ECN draft auto-classified · audit bundle attached`
+                  : 'Open the external view to see how the auditor sees it.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/parts/${partId}`}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </Link>
+              {pushedEcnId === null ? (
+                <button
+                  type="button"
+                  onClick={handlePush}
+                  disabled={selectedDecisions.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Push to Windchill
+                </button>
+              ) : (
+                <a
+                  href={`/external/windchill/ecn/${pushedEcnId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
+                >
+                  Open in Windchill
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          </footer>
         </section>
       </div>
 
-      {/* Progress / success modal */}
-      {phase !== 'idle' && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm dv-anim-fade-in">
-          <div className="dv-anim-pop w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-            {phase === 'success' ? (
-              <div className="p-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                  <CheckCircle2 className="h-7 w-7" />
-                </div>
-                <h2 className="mt-4 text-base font-bold tracking-tight text-slate-900">
-                  Pushed successfully
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  All {readyToPush.length} decisions are now in Windchill.
-                </p>
-
-                <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/80">
-                    ECN ID
-                  </p>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <code className="font-mono text-base font-bold text-emerald-900">{ecnId}</code>
-                    <a
-                      href="#"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:underline"
-                    >
-                      Open in Windchill
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={reset}
-                    className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Close
-                  </button>
-                  <Link
-                    href={`/parts/${partId}`}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
-                  >
-                    Back to viewer
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6">
-                <div className="flex items-center gap-3">
-                  <span className="inline-block h-5 w-5 animate-spin rounded-full border-[2.5px] border-primary border-r-transparent" />
-                  <h2 className="text-sm font-bold tracking-tight text-slate-900">
-                    Pushing to {SYNC_STATE.target}
-                  </h2>
-                </div>
-                <ul className="mt-5 space-y-2">
-                  {PHASES.map((p) => {
-                    const reached = PHASES.findIndex((x) => x.id === phase) >= PHASES.findIndex((x) => x.id === p.id)
-                    const isCurrent = p.id === phase
-                    return (
-                      <li
-                        key={p.id}
-                        className={`flex items-center gap-3 rounded-md px-3 py-2 text-xs transition ${
-                          isCurrent
-                            ? 'bg-primary-50 text-primary-700'
-                            : reached
-                            ? 'text-slate-700'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                            reached
-                              ? isCurrent
-                                ? 'bg-primary text-white'
-                                : 'bg-emerald-500 text-white'
-                              : 'bg-slate-100 text-slate-400'
-                          }`}
-                        >
-                          {reached && !isCurrent ? <Check className="h-3 w-3" /> : null}
-                        </span>
-                        <span className="flex-1">{p.label}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
-                <p className="mt-4 text-[10px] text-slate-400">
-                  Do not close this window — the ECN ID assigns server-side.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <PushToPLMModal
+        open={modalOpen}
+        trigger={pushTrigger}
+        vendor={SEED_PLM_CONNECTION.vendor}
+        vendorHost={SEED_PLM_CONNECTION.host}
+        ecnId={pushedEcnId}
+        onComplete={handlePushComplete}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
-  )
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-      {children}
-    </th>
   )
 }

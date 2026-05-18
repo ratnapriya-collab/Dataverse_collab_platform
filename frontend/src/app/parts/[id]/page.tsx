@@ -13,6 +13,7 @@ import RoleSwitcher, { type ViewRole } from '@/components/redaction/RoleSwitcher
 import PartnerViewBanner from '@/components/redaction/PartnerViewBanner'
 import RedactedDecisionCard from '@/components/redaction/RedactedDecisionCard'
 import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplainer'
+import PartViewTabs from '@/components/parts/PartViewTabs'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import type {
@@ -322,6 +323,12 @@ export default function PartPage() {
           partPath={`/parts/${partId ?? ''}`}
         />
       )}
+
+      <PartViewTabs
+        partId={partId ?? ''}
+        active="3d"
+        contextChip={`${labels.length} pins · ${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}`}
+      />
 
       <section className="grid flex-1 grid-cols-[1fr_360px] overflow-hidden">
         <div className="relative bg-slate-100">

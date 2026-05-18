@@ -1208,6 +1208,191 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   orphaned: [],
 }
 
+// ── 2D drawing PMI callouts (used by /parts/[id]/drawing) ────────────────────
+
+export type PMISymbol = 'diameter' | 'flatness' | 'concentricity' | 'position' | 'parallelism' | 'perpendicularity' | 'surface'
+
+export interface MockPMICallout {
+  id: string
+  /** Glyph + value as engineers read it, e.g. "⌀10 ±0.05". */
+  label: string
+  symbol: PMISymbol
+  /** Position on the drawing canvas in % (0..100). */
+  xPct: number
+  yPct: number
+  /** Datum it references, e.g. "A" or "A-B". Optional. */
+  datum?: string
+  /** Linked decision id (deep-link target). Optional. */
+  linked_decision_id?: string
+  /** One-line plain-English explanation shown in the sidebar tooltip. */
+  note: string
+}
+
+export const SEED_PMI_CALLOUTS: MockPMICallout[] = [
+  {
+    id: 'pmi-1',
+    label: '⌀10 ±0.05',
+    symbol: 'diameter',
+    xPct: 26,
+    yPct: 33,
+    note: 'Bolt hole diameter · class 7 fit · 4 places',
+    linked_decision_id: 'DEC-BRACKET-09',
+  },
+  {
+    id: 'pmi-2',
+    label: '⊥ 0.05 | A',
+    symbol: 'perpendicularity',
+    xPct: 60,
+    yPct: 24,
+    datum: 'A',
+    note: 'Perpendicularity of mounting boss to datum A · 0.05 mm',
+  },
+  {
+    id: 'pmi-3',
+    label: '◎ 0.02 | A-B',
+    symbol: 'concentricity',
+    xPct: 44,
+    yPct: 50,
+    datum: 'A-B',
+    note: 'Concentricity of inlet flange to datums A-B · 0.02 mm',
+    linked_decision_id: 'DEC-TURBO-V3-08',
+  },
+  {
+    id: 'pmi-4',
+    label: '▱ 0.02',
+    symbol: 'flatness',
+    xPct: 30,
+    yPct: 72,
+    note: 'Flatness of seating surface · 0.02 mm over 50 × 80 mm',
+  },
+  {
+    id: 'pmi-5',
+    label: 'Ra 1.6 µm',
+    symbol: 'surface',
+    xPct: 76,
+    yPct: 55,
+    note: 'Surface finish on the inlet flange · sealing requirement',
+    linked_decision_id: 'DEC-TURBO-V3-08',
+  },
+  {
+    id: 'pmi-6',
+    label: '∥ 0.10 | A',
+    symbol: 'parallelism',
+    xPct: 70,
+    yPct: 78,
+    datum: 'A',
+    note: 'Parallelism of opposing bolt face to datum A · 0.10 mm',
+  },
+]
+
+// ── BOM (Bill of Materials) mock (used by /parts/[id]/bom) ───────────────────
+
+export interface MockBomNode {
+  id: string
+  /** Part number / catalog id. */
+  part_number: string
+  name: string
+  quantity: number
+  /** Optional supplier reference, e.g. "McMaster 91290A150". */
+  supplier_ref?: string
+  /** Material flavour shown as a chip. */
+  material?: string
+  /** Decisions logged against this row. */
+  decisions_count: number
+  /** Optional deep-link to a real part viewer. */
+  part_id?: string
+  children?: MockBomNode[]
+}
+
+export const SEED_BOM: MockBomNode = {
+  id: 'bom-root',
+  part_number: 'BR-AERO-014',
+  name: 'Wing Spar Bracket Assembly',
+  quantity: 1,
+  material: 'mixed',
+  decisions_count: 12,
+  part_id: 'demo_2',
+  children: [
+    {
+      id: 'bom-mount-sub',
+      part_number: 'MNT-SUB-022',
+      name: 'Mount Subassembly',
+      quantity: 1,
+      decisions_count: 4,
+      children: [
+        {
+          id: 'bom-plate',
+          part_number: 'Plate-MNT-301',
+          name: 'Mount Plate',
+          quantity: 1,
+          material: 'Ti-6Al-4V',
+          decisions_count: 3,
+          part_id: 'demo_4',
+        },
+        {
+          id: 'bom-washer',
+          part_number: 'Washer-R-10',
+          name: 'Rubber Washer',
+          quantity: 2,
+          material: 'EPDM 70',
+          decisions_count: 1,
+        },
+      ],
+    },
+    {
+      id: 'bom-bolt',
+      part_number: 'Bolt-M6-30',
+      name: 'M6 × 30 Hex Bolt',
+      quantity: 4,
+      supplier_ref: 'McMaster 91290A150',
+      material: 'A2-70 stainless',
+      decisions_count: 1,
+    },
+    {
+      id: 'bom-spacer',
+      part_number: 'Spacer-AL-12',
+      name: 'Aluminium Spacer',
+      quantity: 2,
+      material: 'AL 6061-T6',
+      decisions_count: 0,
+    },
+    {
+      id: 'bom-nut',
+      part_number: 'Nut-LCK-M6',
+      name: 'M6 Locking Nut',
+      quantity: 4,
+      supplier_ref: 'McMaster 90631A005',
+      material: 'A2-70 stainless',
+      decisions_count: 0,
+    },
+    {
+      id: 'bom-fastener-sub',
+      part_number: 'FAST-SUB-007',
+      name: 'Fastener Kit',
+      quantity: 1,
+      decisions_count: 0,
+      children: [
+        {
+          id: 'bom-washer-flat',
+          part_number: 'Washer-F-6',
+          name: 'M6 Flat Washer',
+          quantity: 4,
+          material: 'A2-70 stainless',
+          decisions_count: 0,
+        },
+        {
+          id: 'bom-washer-spring',
+          part_number: 'Washer-S-6',
+          name: 'M6 Spring Washer',
+          quantity: 4,
+          material: 'A2-70 stainless',
+          decisions_count: 0,
+        },
+      ],
+    },
+  ],
+}
+
 // ── Knowledge Graph mocks (used by /knowledge-graph) ────────────────────────
 
 export type KGNodeKind = 'standard' | 'decision' | 'part'

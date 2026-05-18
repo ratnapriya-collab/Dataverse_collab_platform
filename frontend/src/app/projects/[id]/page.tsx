@@ -1,91 +1,58 @@
 'use client'
 
+/**
+ * /projects/[id] — Project collaboration hub (CoLab pattern).
+ *
+ * Flow:  Workspace → click project card → land here.
+ *
+ * Layout: WorkspaceSidebar + sticky breadcrumb + ProjectHubHero,
+ * followed by a 4-tab strip (Parts · Decisions · Activity · Members)
+ * with inline tab content. Each tab is project-scoped:
+ *
+ *   PARTS      grid of parts in this project → click → /parts/[id]
+ *              (3D + 2D + BOM viewer)
+ *   DECISIONS  the decisions raised against parts in this project
+ *   ACTIVITY   recent events
+ *   MEMBERS    who's collaborating + role + team badge
+ *
+ * Mock-only: parts derive from SEED_FULL_DECISIONS keyed by project_id.
+ */
+
 import Link from 'next/link'
 import { notFound, useParams, useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  ArrowLeft,
-  Box,
-  ChevronRight,
-  Download,
-  History,
-  MessageSquare,
-  Plus,
-  Share2,
-  Users,
-} from 'lucide-react'
-import Logo from '@/components/ui/Logo'
-import UserBadge from '@/components/ui/UserBadge'
+import { ArrowUpRight, ChevronRight, FileBox, FolderKanban, Inbox } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
-import Avatar, { AvatarStack } from '@/components/workspace/Avatar'
-import ProjectThumbnail from '@/components/workspace/ProjectThumbnail'
+import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
+import ProjectHubHero from '@/components/projects/ProjectHubHero'
+import ProjectHubTabs, { type ProjectHubTab } from '@/components/projects/ProjectHubTabs'
+import Avatar from '@/components/workspace/Avatar'
+import TeamBadge from '@/components/workspace/TeamBadge'
+import Toast, { type ToastState } from '@/components/ui/Toast'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import {
+  SEED_ACTIVITY,
+  SEED_FULL_DECISIONS,
+  SEED_MEMBERS,
   formatTimeAgo,
   getProject,
-  SEED_MEMBERS,
-  type MockProject,
-  type ProjectStatus,
   withCurrentUser,
+  type MockFullDecision,
+  type ActivityEntry,
+  type MockMember,
 } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
-const ViewerCanvas = dynamic(() => import('@/components/viewer/ViewerCanvas'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-      Loading 3D viewer…
-    </div>
-  ),
-})
-
-const STATUS_STYLES: Record<ProjectStatus, { dot: string; text: string; label: string }> = {
-  ACTIVE: { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Active' },
-  IN_REVIEW: { dot: 'bg-amber-500', text: 'text-amber-700', label: 'In review' },
-  APPROVED: { dot: 'bg-primary-500', text: 'text-primary-700', label: 'Approved' },
-  ARCHIVED: { dot: 'bg-slate-400', text: 'text-slate-600', label: 'Archived' },
+const STATE_PILL: Record<MockFullDecision['state'], { bg: string; fg: string; dot: string }> = {
+  DRAFT: { bg: 'bg-slate-100', fg: 'text-slate-600', dot: 'bg-slate-400' },
+  PROPOSED: { bg: 'bg-amber-50', fg: 'text-amber-700', dot: 'bg-amber-500' },
+  ACCEPTED: { bg: 'bg-emerald-50', fg: 'text-emerald-700', dot: 'bg-emerald-500' },
+  REJECTED: { bg: 'bg-rose-50', fg: 'text-rose-700', dot: 'bg-rose-500' },
+  SUPERSEDED: { bg: 'bg-slate-100', fg: 'text-slate-500', dot: 'bg-slate-400' },
 }
 
-interface MockComment {
-  id: string
-  author_name: string
-  rationale: string
-  created_at: string
-  state: 'PROPOSED' | 'ACCEPTED' | 'REJECTED'
-}
-
-function mockCommentsFor(project: MockProject): MockComment[] {
-  const NOW = Date.now()
-  const all: MockComment[] = [
-    {
-      id: 'c1',
-      author_name: 'Sarah Chen',
-      rationale:
-        'Wall thickness at the inlet flange is 1.6 mm — needs ≥ 2.0 mm per the supplier spec.',
-      created_at: new Date(NOW - 35 * 60_000).toISOString(),
-      state: 'PROPOSED',
-    },
-    {
-      id: 'c2',
-      author_name: 'David Kim',
-      rationale: 'Surface finish on the seal face should be Ra 0.8 µm or better.',
-      created_at: new Date(NOW - 3 * 3_600_000).toISOString(),
-      state: 'ACCEPTED',
-    },
-    {
-      id: 'c3',
-      author_name: 'John Williams',
-      rationale: 'Confirm hole pattern aligns with the ECU module mounting bosses.',
-      created_at: new Date(NOW - 18 * 3_600_000).toISOString(),
-      state: 'PROPOSED',
-    },
-  ]
-  return all.slice(0, Math.max(1, project.open_comments + 1))
-}
-
-export default function ProjectPage() {
+export default function ProjectHubPage(): JSX.Element {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = params?.id ?? ''
@@ -93,6 +60,8 @@ export default function ProjectPage() {
 
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
+  const [tab, setTab] = useState<ProjectHubTab>('parts')
 
   useEffect(() => {
     let cancelled = false
@@ -115,37 +84,66 @@ export default function ProjectPage() {
     }
   }, [router])
 
-  const members = useMemo(() => {
+  // Members on THIS project
+  const projectMembers = useMemo<MockMember[]>(() => {
     if (project === undefined) return []
     return withCurrentUser(SEED_MEMBERS, user?.name ?? 'You', user?.email ?? '').filter(
       (m) => project.member_names.includes(m.name) || m.is_you,
     )
   }, [project, user])
 
-  const comments = useMemo(
-    () => (project !== undefined ? mockCommentsFor(project) : []),
-    [project],
-  )
+  // Decisions scoped to this project
+  const decisions = useMemo<MockFullDecision[]>(() => {
+    if (project === undefined) return []
+    return SEED_FULL_DECISIONS.filter((d) => d.project_id === project.id)
+  }, [project])
+
+  // Parts derived from this project's decisions (one card per part_id)
+  type ProjectPart = { id: string; name: string; decisions_count: number; open_count: number }
+  const parts = useMemo<ProjectPart[]>(() => {
+    const m = new Map<string, ProjectPart>()
+    for (const d of decisions) {
+      const existing = m.get(d.part_id) ?? {
+        id: d.part_id,
+        name: d.part_name,
+        decisions_count: 0,
+        open_count: 0,
+      }
+      existing.decisions_count += 1
+      if (d.state === 'PROPOSED' || d.state === 'DRAFT') existing.open_count += 1
+      m.set(d.part_id, existing)
+    }
+    return Array.from(m.values())
+  }, [decisions])
+
+  // Activity — workspace-wide for now, since SEED_ACTIVITY isn't project-keyed.
+  // We surface the slice most likely to belong to this project by matching
+  // actor or part-name fragments — a heuristic that keeps the demo realistic.
+  const activity = useMemo<ActivityEntry[]>(() => {
+    if (project === undefined) return []
+    const partNames = parts.map((p) => p.name.toLowerCase())
+    return SEED_ACTIVITY.filter((a) => {
+      if (a.target === undefined) return false
+      const t = a.target.toLowerCase()
+      if (partNames.some((n) => t.includes(n.split(' ')[0]?.toLowerCase() ?? ''))) return true
+      return project.member_names.includes(a.actor_name)
+    }).slice(0, 8)
+  }, [project, parts])
 
   function handleSignOut(): void {
     clearToken()
     router.replace('/login')
   }
 
-  if (project === undefined) {
-    notFound()
-  }
+  if (project === undefined) notFound()
 
   if (error !== null) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
+        <p role="alert" className="text-sm text-red-600">{error}</p>
       </main>
     )
   }
-
   if (user === null) {
     return (
       <main className="flex min-h-screen items-center justify-center text-slate-500">
@@ -154,249 +152,294 @@ export default function ProjectPage() {
     )
   }
 
-  const status = STATUS_STYLES[project.status]
+  const counts: Record<ProjectHubTab, number> = {
+    parts: parts.length,
+    decisions: decisions.length,
+    activity: activity.length,
+    members: projectMembers.length,
+  }
 
   return (
-    <main className="flex h-screen flex-col bg-slate-50">
-      {/* ── Navbar with breadcrumb ──────────────────────────────────────── */}
-      <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-3">
-          <div className="flex min-w-0 items-center gap-4">
-            <Link
-              href="/workspace"
-              aria-label="Back to workspace"
-              title="Back to workspace"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary hover:shadow-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
+    <div className="flex min-h-screen bg-slate-50">
+      <WorkspaceSidebar user={user} current="projects" onSignOut={handleSignOut} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Toast toast={toast} onClose={() => setToast(null)} />
+
+        {/* Breadcrumb header */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/85 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-1.5 text-xs">
+            <FolderKanban className="h-3 w-3 text-primary" />
+            <Link href="/workspace" className="font-semibold uppercase tracking-wider text-slate-400 hover:text-primary">
+              Workspace
             </Link>
-            <Logo compact markClassName="h-8 w-8" />
-            <div className="flex min-w-0 items-center gap-2 border-l border-slate-200 pl-4 text-sm">
-              <Link href="/workspace" className="text-slate-500 hover:text-primary">
-                Workspace
-              </Link>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
-              <span className="truncate font-semibold text-slate-900">{project.name}</span>
-              <span
-                className={`ml-2 inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold ${status.text}`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                {status.label}
-              </span>
-            </div>
+            <ChevronRight className="h-3 w-3 text-slate-300" />
+            <Link href="/workspace" className="text-slate-500 hover:text-primary">Projects</Link>
+            <ChevronRight className="h-3 w-3 text-slate-300" />
+            <span className="font-semibold text-slate-900">{project.name}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <NotificationsBell />
-            <UserBadge name={user.name} email={user.email} />
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+          <NotificationsBell />
+        </header>
 
-      {/* ── Main 2-column ───────────────────────────────────────────────── */}
-      <section className="grid flex-1 grid-cols-[1fr_380px] overflow-hidden">
-        <div className="relative bg-slate-100">
-          <ViewerCanvas />
-        </div>
-
-        <aside className="dv-thin-scroll overflow-y-auto border-l border-slate-200 bg-white">
-          {/* Hero card with thumbnail */}
-          <div className="relative">
-            <ProjectThumbnail shape={project.shape} tone={project.tone} aspectClass="aspect-[16/9]" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
-              <h1 className="text-lg font-bold text-white">{project.name}</h1>
-            </div>
+        <section className="mx-auto w-full max-w-6xl px-6 py-8">
+          {/* Hero */}
+          <div className="dv-anim-fade-up">
+            <ProjectHubHero
+              project={project}
+              memberCount={projectMembers.length}
+              onUploadPart={() => setToast({ message: 'Open the Parts tab below to upload a part', tone: 'success' })}
+              onInvite={() => setToast({ message: 'Invite a teammate via Admin → Invites', tone: 'success' })}
+              onShare={() => setToast({ message: 'Share link copied', tone: 'success' })}
+              onSettings={() => setToast({ message: 'Project settings coming soon', tone: 'success' })}
+            />
           </div>
 
-          <div className="px-5 py-4">
-            <p className="text-xs leading-relaxed text-slate-600">{project.description}</p>
-
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <Stat label="Parts" value={project.parts_count} />
-              <Stat label="Open" value={project.open_comments} tone="red" />
-              <Stat label="Members" value={members.length} />
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-primary to-primary-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:shadow-md"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New comment
-              </button>
-              <button
-                type="button"
-                aria-label="Share project"
-                title="Share project"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label="Download"
-                title="Download"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </button>
-            </div>
+          {/* Tabs */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '80ms' }}>
+            <ProjectHubTabs active={tab} onChange={setTab} counts={counts} />
           </div>
 
-          <hr className="border-slate-200" />
-
-          {/* Members */}
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between">
-              <h3 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <Users className="h-3 w-3" />
-                Members
-              </h3>
-              <AvatarStack names={project.member_names} size="sm" max={3} />
-            </div>
-            <ul className="mt-3 space-y-2">
-              {members.map((m) => (
-                <li key={m.id} className="flex items-center gap-2.5">
-                  <Avatar name={m.name} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-slate-900">
-                      {m.name}
-                      {m.is_you && (
-                        <span className="ml-1.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[9px] font-bold text-brand-700">
-                          YOU
-                        </span>
-                      )}
-                    </p>
-                    <p className="truncate text-[11px] text-slate-500">{m.email}</p>
-                  </div>
-                  <span className="text-[10px] font-semibold uppercase text-slate-500">
-                    {m.role}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {/* Tab content */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '160ms' }} key={tab}>
+            {tab === 'parts' && <PartsTab parts={parts} />}
+            {tab === 'decisions' && <DecisionsTab decisions={decisions} />}
+            {tab === 'activity' && <ActivityTab activity={activity} />}
+            {tab === 'members' && <MembersTab members={projectMembers} projectName={project.name} />}
           </div>
-
-          <hr className="border-slate-200" />
-
-          {/* Comments thread */}
-          <div className="px-5 py-4">
-            <h3 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <MessageSquare className="h-3 w-3" />
-              Comments
-              <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                {comments.length}
-              </span>
-            </h3>
-            <ul className="mt-3 space-y-3">
-              {comments.map((c) => (
-                <li
-                  key={c.id}
-                  className={`rounded-lg border-l-4 bg-slate-50 px-3 py-2.5 ${
-                    c.state === 'ACCEPTED'
-                      ? 'border-l-emerald-500'
-                      : c.state === 'REJECTED'
-                        ? 'border-l-slate-400'
-                        : 'border-l-red-500'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar name={c.author_name} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-slate-900">
-                        {c.author_name}
-                      </p>
-                      <p className="text-[10px] text-slate-500">
-                        {formatTimeAgo(c.created_at)} ·{' '}
-                        <span
-                          className={
-                            c.state === 'ACCEPTED'
-                              ? 'text-emerald-700'
-                              : c.state === 'REJECTED'
-                                ? 'text-slate-500'
-                                : 'text-red-700'
-                          }
-                        >
-                          {c.state}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-700">
-                    {c.rationale}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <hr className="border-slate-200" />
-
-          {/* Activity teaser */}
-          <div className="px-5 py-4 pb-6">
-            <h3 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <History className="h-3 w-3" />
-              Activity
-            </h3>
-            <ul className="mt-3 space-y-2 text-[11px] text-slate-600">
-              <li className="flex items-center gap-2">
-                <Box className="h-3 w-3 text-slate-400" />
-                <span>
-                  <span className="font-semibold text-slate-900">Sarah Chen</span> uploaded
-                  a new part · 25m ago
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <MessageSquare className="h-3 w-3 text-slate-400" />
-                <span>
-                  <span className="font-semibold text-slate-900">David Kim</span> accepted
-                  a comment · 3h ago
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Users className="h-3 w-3 text-slate-400" />
-                <span>
-                  <span className="font-semibold text-slate-900">Maria Garcia</span> joined
-                  this project · 2d ago
-                </span>
-              </li>
-            </ul>
-            <p className="mt-4 text-center text-[10px] text-slate-400">
-              Mock project · Geometry shown is sample
-            </p>
-          </div>
-        </aside>
-      </section>
-    </main>
+        </section>
+      </div>
+    </div>
   )
 }
 
-function Stat({
-  label,
-  value,
-  tone = 'slate',
-}: {
-  label: string
-  value: number
-  tone?: 'slate' | 'red'
-}) {
+// ───────────────────────────────────────────────────────────────────────────
+// TAB CONTENT — kept inline since each tab is scoped tightly to this page.
+// ───────────────────────────────────────────────────────────────────────────
+
+function PartsTab({ parts }: { parts: Array<{ id: string; name: string; decisions_count: number; open_count: number }> }): JSX.Element {
+  if (parts.length === 0) {
+    return (
+      <EmptyTab
+        icon={FileBox}
+        title="No parts yet on this project"
+        body="Upload a STEP / GLB to start anchoring decisions to its geometry."
+      />
+    )
+  }
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-      <p
-        className={`text-lg font-bold tabular-nums ${tone === 'red' && value > 0 ? 'text-red-600' : 'text-slate-900'}`}
-      >
-        {value}
-      </p>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {parts.map((p, idx) => (
+        <li
+          key={p.id}
+          className="dv-anim-fade-up"
+          style={{ animationDelay: `${Math.min(idx * 50, 240)}ms`, animationFillMode: 'backwards' }}
+        >
+          <Link
+            href={`/parts/${p.id}`}
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-px hover:border-primary/30 hover:shadow-md"
+          >
+            <div
+              className="relative h-32 w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900"
+              aria-hidden="true"
+            >
+              <div
+                className="absolute inset-0 opacity-[0.18]"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
+                  backgroundSize: '18px 18px',
+                }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <FileBox className="h-12 w-12 text-white/40 transition group-hover:scale-110 group-hover:text-white/60" />
+              </div>
+              {p.open_count > 0 && (
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 ring-1 ring-amber-300">
+                  {p.open_count} open
+                </span>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-2 p-4">
+              <div>
+                <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
+                <p className="font-mono text-[10px] text-slate-500">{p.id}</p>
+              </div>
+              <div className="mt-auto flex items-center justify-between">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                  {p.decisions_count} {p.decisions_count === 1 ? 'decision' : 'decisions'}
+                </span>
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-primary opacity-0 transition group-hover:opacity-100">
+                  Open
+                  <ArrowUpRight className="h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function DecisionsTab({ decisions }: { decisions: MockFullDecision[] }): JSX.Element {
+  if (decisions.length === 0) {
+    return (
+      <EmptyTab
+        icon={Inbox}
+        title="No decisions raised yet"
+        body="Open a part and click any face on the 3D viewer to propose your first decision."
+      />
+    )
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <ul className="divide-y divide-slate-100">
+        {decisions
+          .slice()
+          .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+          .map((d) => {
+            const s = STATE_PILL[d.state]
+            return (
+              <li key={d.id} className="group flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50/60">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.bg} ${s.fg}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
+                  {d.state.toLowerCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <Link
+                      href={`/parts/${d.part_id}?focus=${d.id}`}
+                      className="text-sm font-semibold text-slate-900 hover:text-primary hover:underline"
+                    >
+                      {d.part_name}
+                    </Link>
+                    <span className="font-mono text-[10px] text-slate-400">{d.id}</span>
+                    <span className="font-mono text-[10px] text-slate-400">· {d.anchor_id}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-slate-700">
+                    {d.rationale}
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+                    <Avatar name={d.author_name} size="sm" />
+                    <span className="font-medium text-slate-700">{d.author_name}</span>
+                    <TeamBadge team={d.author_team} size="xs" variant="dot" />
+                    <span className="ml-auto text-slate-400">{formatTimeAgo(d.created_at)}</span>
+                  </div>
+                </div>
+                <Link
+                  href={`/parts/${d.part_id}?focus=${d.id}`}
+                  className="inline-flex shrink-0 items-center gap-0.5 rounded-md px-2 py-1 text-[11px] font-semibold text-primary opacity-0 transition group-hover:opacity-100 hover:bg-primary-50"
+                >
+                  Open
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </li>
+            )
+          })}
+      </ul>
+    </div>
+  )
+}
+
+function ActivityTab({ activity }: { activity: ActivityEntry[] }): JSX.Element {
+  if (activity.length === 0) {
+    return (
+      <EmptyTab icon={Inbox} title="No activity yet" body="Decisions, uploads and signoffs will appear here as they happen." />
+    )
+  }
+  return (
+    <ol className="relative space-y-3 pl-10">
+      <span aria-hidden="true" className="absolute left-4 bottom-3 top-3 w-px bg-slate-200" />
+      {activity.map((a) => (
+        <li key={a.id} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute -left-[24px] top-3 z-10 flex h-3 w-3 items-center justify-center rounded-full bg-primary ring-4 ring-slate-50"
+          />
+          <article className="overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Avatar name={a.actor_name} size="sm" />
+              <p className="text-[12px]">
+                <span className="font-semibold text-slate-900">{a.actor_name}</span>
+                <span className="text-slate-600"> {a.kind.replace(/_/g, ' ').toLowerCase()}</span>
+                {a.target !== undefined && (
+                  <span className="ml-1 font-mono text-[11px] text-slate-700">{a.target}</span>
+                )}
+              </p>
+              <span className="ml-auto whitespace-nowrap text-[10px] text-slate-400">
+                {formatTimeAgo(a.created_at)}
+              </span>
+            </div>
+            {a.snippet !== undefined && (
+              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-600">
+                {a.snippet}
+              </p>
+            )}
+          </article>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function MembersTab({ members, projectName }: { members: MockMember[]; projectName: string }): JSX.Element {
+  return (
+    <div className="space-y-3">
+      <header className="flex items-center justify-between">
+        <p className="text-[11px] text-slate-500">
+          {members.length} {members.length === 1 ? 'person is' : 'people are'} collaborating on{' '}
+          <strong className="font-semibold text-slate-900">{projectName}</strong>
+        </p>
+      </header>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {members.map((m) => (
+          <li
+            key={m.id}
+            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <Avatar name={m.name} size="lg" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-slate-900">
+                {m.name}
+                {m.is_you === true && (
+                  <span className="ml-1.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[9px] font-bold text-brand-700">
+                    YOU
+                  </span>
+                )}
+              </p>
+              <p className="truncate text-[11px] text-slate-500">{m.email}</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                  {m.role}
+                </span>
+                {m.team !== undefined && <TeamBadge team={m.team} size="xs" variant="dot" />}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function EmptyTab({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: typeof FileBox
+  title: string
+  body: string
+}): JSX.Element {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary">
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="mt-3 text-sm font-semibold text-slate-900">{title}</p>
+      <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">{body}</p>
     </div>
   )
 }

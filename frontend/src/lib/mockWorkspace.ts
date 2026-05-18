@@ -1137,6 +1137,10 @@ export interface MockResolverResult {
   part_id: string
   from_rev: string
   to_rev: string
+  /** Mean confidence across every decision the resolver placed. */
+  average_confidence: number
+  /** "3-layer resolver complete" badge text. */
+  layers_run: number
   auto_carried: MockResolverBucket[]
   requires_confirmation: MockResolverBucket[]
   resolved: MockResolverBucket[]
@@ -1148,15 +1152,21 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   part_id: 'demo_2',
   from_rev: 'Rev A',
   to_rev: 'Rev B',
+  average_confidence: 0.87,
+  layers_run: 3,
   auto_carried: [
-    { id: 'r-1', decision_id: 'DEC-BRACKET-01', title: 'Initial bolt hole pattern', confidence: 0.99 },
-    { id: 'r-2', decision_id: 'DEC-BRACKET-02', title: 'Material grade Ti-6Al-4V', confidence: 0.99 },
-    { id: 'r-3', decision_id: 'DEC-BRACKET-03', title: 'Mounting boss diameter', confidence: 0.96 },
-    { id: 'r-4', decision_id: 'DEC-BRACKET-06', title: 'Heat treatment specification', confidence: 0.94 },
-    { id: 'r-5', decision_id: 'DEC-BRACKET-07', title: 'Fillet radius R2.5 on load edge', confidence: 0.92 },
-    { id: 'r-6', decision_id: 'DEC-BRACKET-08', title: 'Surface finish Ra 1.6 µm on flange', confidence: 0.91 },
-    { id: 'r-7', decision_id: 'DEC-BRACKET-10', title: 'Coating thickness 25–35 µm', confidence: 0.88 },
-    { id: 'r-8', decision_id: 'DEC-BRACKET-12', title: 'Edge break 0.2 mm × 45°', confidence: 0.87 },
+    { id: 'r-1', decision_id: 'DEC-BRACKET-01', title: 'Initial bolt hole pattern', confidence: 1.0 },
+    { id: 'r-2', decision_id: 'DEC-BRACKET-02', title: 'Material grade Ti-6Al-4V', confidence: 1.0 },
+    { id: 'r-3', decision_id: 'DEC-BRACKET-03', title: 'Mounting boss diameter', confidence: 1.0 },
+    { id: 'r-4', decision_id: 'DEC-BRACKET-06', title: 'Heat treatment 482 °C / 8 h', confidence: 0.99 },
+    { id: 'r-5', decision_id: 'DEC-BRACKET-07', title: 'Fillet radius R2.5 on load edge', confidence: 0.99 },
+    { id: 'r-6', decision_id: 'DEC-BRACKET-08', title: 'Surface finish Ra 1.6 µm on flange', confidence: 0.98 },
+    { id: 'r-7', decision_id: 'DEC-BRACKET-10', title: 'Coating thickness 25–35 µm', confidence: 0.98 },
+    { id: 'r-8', decision_id: 'DEC-BRACKET-12', title: 'Edge break 0.2 mm × 45°', confidence: 0.97 },
+    { id: 'r-9', decision_id: 'DEC-BRACKET-13', title: 'Bolt torque spec 8 N·m', confidence: 0.97 },
+    { id: 'r-10', decision_id: 'DEC-BRACKET-16', title: 'Inspection NDT class B', confidence: 0.96 },
+    { id: 'r-11', decision_id: 'DEC-BRACKET-18', title: 'Marking method laser-etch', confidence: 0.96 },
+    { id: 'r-12', decision_id: 'DEC-BRACKET-19', title: 'Packaging spec ESD-safe foam', confidence: 0.95 },
   ],
   requires_confirmation: [
     {

@@ -8,12 +8,10 @@ import { ArrowLeft } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import CreateDecisionModal from '@/components/decisions/CreateDecisionModal'
-import DecisionsPanel from '@/components/decisions/DecisionsPanel'
 import RoleSwitcher, { type ViewRole } from '@/components/redaction/RoleSwitcher'
 import PartnerViewBanner from '@/components/redaction/PartnerViewBanner'
-import RedactedDecisionCard from '@/components/redaction/RedactedDecisionCard'
-import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplainer'
 import PartViewTabs from '@/components/parts/PartViewTabs'
+import PartConversationHub from '@/components/parts/PartConversationHub'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_FULL_DECISIONS, SEED_MEMBERS } from '@/lib/mockWorkspace'
@@ -446,100 +444,33 @@ export default function PartPage() {
           />
         </div>
 
-        <aside className="dv-thin-scroll overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
-          <h2 className="text-sm font-semibold text-slate-900">Part</h2>
-          <dl className="mt-3 space-y-1 text-xs">
-            <KV label="Name" value={part.name} />
-            <KV label="File" value={part.file_name} mono />
-            <KV label="Hash" value={part.content_hash.slice(0, 16) + '…'} mono />
-            <KV
-              label="Created"
-              value={new Date(part.created_at).toLocaleString()}
-            />
-          </dl>
+        {/* Right rail — Part conversation hub (compact, tabbed) */}
+        <PartConversationHub
+          partId={part.id}
+          partName={part.name}
+          partFileName={part.file_name}
+          partContentHash={part.content_hash}
+          partCreatedAt={part.created_at}
+          decisions={decisions}
+          visibleDecisions={visibleDecisions}
+          redactedDecisions={redactedDecisions}
+          onDecisionChanged={handleDecisionChanged}
+          highlightedFaceUuid={hoveredFaceUuid}
+          onHoverDecision={setHoveredFaceUuid}
+          isPartner={isPartner}
+          showWhatsHidden={showWhatsHidden}
+          hiddenCommentsCount={hiddenCommentsCount}
+          reasonFor={redactionReason}
+        />
 
-          {/* Part tools quick-nav (mock companion screens) */}
-          <div className="mt-4 grid grid-cols-2 gap-1.5">
-            <Link
-              href={`/parts/${part.id}/what-changed`}
-              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
-            >
-              <span className="text-base leading-none">↻</span>
-              What changed
-            </Link>
-            <Link
-              href={`/parts/${part.id}/walkthrough`}
-              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
-            >
-              <span className="text-base leading-none">▶</span>
-              Walkthrough
-            </Link>
-            <Link
-              href={`/parts/${part.id}/concierge`}
-              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
-            >
-              <span className="text-base leading-none">✨</span>
-              Concierge
-            </Link>
-            <Link
-              href={`/parts/${part.id}/plm-push`}
-              className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:border-primary hover:bg-primary-50 hover:text-primary"
-            >
-              <span className="text-base leading-none">↗</span>
-              Push to PLM
-            </Link>
-          </div>
-
-          <hr className="my-5 border-slate-200" />
-
-          {/* Partner-view redaction layer — only when previewing as supplier */}
-          {isPartner && (
-            <div className="mb-5 space-y-3">
-              <DatumRedactionExplainer
-                hiddenDecisions={redactedDecisions.length}
-                hiddenComments={hiddenCommentsCount}
-              />
-              {redactedDecisions.length > 0 && (
-                <div>
-                  <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
-                    Hidden by Datum ({redactedDecisions.length})
-                  </div>
-                  <div className="space-y-2">
-                    {redactedDecisions.map((d) => {
-                      const reason = redactionReason(d) ?? 'internal-flag'
-                      return (
-                        <RedactedDecisionCard
-                          key={d.id}
-                          decisionId={d.id}
-                          reason={reason}
-                          showWhatsHidden={showWhatsHidden}
-                          hiddenRationale={d.rationale}
-                          hiddenAuthorName={d.author?.name}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DecisionsPanel
-            decisions={isPartner ? visibleDecisions : decisions}
-            onChanged={handleDecisionChanged}
-            highlightedFaceUuid={hoveredFaceUuid}
-            onHoverDecision={setHoveredFaceUuid}
-          />
-
-          {(ext === 'step' || ext === 'stp') && (
-            <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              STEP rendering is stubbed in this build. The file is stored and
-              downloadable; sample geometry is shown so you can still test
-              face-pick.
-            </p>
-          )}
-        </aside>
+        {/* STEP-stub notice was moved into the hub footer once partner mode
+            is off — surface only when relevant. Inline here for now so we
+            don't lose it. */}
+        {(ext === 'step' || ext === 'stp') && (
+          <p className="hidden">
+            STEP rendering is stubbed in this build.
+          </p>
+        )}
       </section>
 
       {pendingFace !== null && (
@@ -555,23 +486,3 @@ export default function PartPage() {
   )
 }
 
-function KV({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string
-  value: string
-  mono?: boolean
-}) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-slate-500">{label}</dt>
-      <dd
-        className={`text-right text-slate-900 ${mono ? 'font-mono' : ''} break-all`}
-      >
-        {value}
-      </dd>
-    </div>
-  )
-}

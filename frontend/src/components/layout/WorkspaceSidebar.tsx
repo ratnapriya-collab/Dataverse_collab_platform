@@ -26,6 +26,7 @@ import {
   Home,
   Inbox,
   LogOut,
+  Network,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,6 +40,7 @@ export type SidebarSection =
   | 'my_work'
   | 'projects'
   | 'decisions'
+  | 'knowledge_graph'
   | 'audit'
   | 'admin'
 
@@ -102,6 +104,12 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       label: 'Decisions',
       icon: FileCheck2,
       href: '/decisions',
+    },
+    {
+      id: 'knowledge_graph',
+      label: 'Knowledge graph',
+      icon: Network,
+      href: '/knowledge-graph',
     },
     {
       id: 'audit',

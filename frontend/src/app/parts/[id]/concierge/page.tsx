@@ -133,6 +133,20 @@ export default function ConciergePage() {
   const step = useMemo(() => STEPS[stepIdx]!, [stepIdx])
   const isLast = stepIdx === STEPS.length - 1
 
+  // Typewriter — reveals the body text character-by-character per step.
+  const [typed, setTyped] = useState('')
+  useEffect(() => {
+    setTyped('')
+    const target = step.body
+    let i = 0
+    const tick = window.setInterval(() => {
+      i += 2
+      setTyped(target.slice(0, i))
+      if (i >= target.length) window.clearInterval(tick)
+    }, 16)
+    return () => window.clearInterval(tick)
+  }, [step.body])
+
   if (error !== null) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
@@ -287,7 +301,12 @@ export default function ConciergePage() {
               <div className="dv-thin-scroll flex-1 overflow-y-auto px-5 py-5">
                 <div key={stepIdx} className="dv-anim-fade-up">
                   <h2 className="text-lg font-bold tracking-tight text-slate-900">{step.title}</h2>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-700">{step.body}</p>
+                  <p className="mt-2 min-h-[7rem] text-sm leading-relaxed text-slate-700">
+                    {typed}
+                    {typed.length < step.body.length && (
+                      <span className="ml-0.5 inline-block h-3.5 w-0.5 -mb-0.5 animate-pulse bg-purple-600 align-middle" aria-hidden="true" />
+                    )}
+                  </p>
 
                   {step.focus !== undefined && (
                     <div className="mt-4 flex items-center gap-2 rounded-lg border border-purple-100 bg-purple-50/60 px-3 py-2 text-[11px] text-purple-900">

@@ -1208,6 +1208,83 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   orphaned: [],
 }
 
+// ── Knowledge Graph mocks (used by /knowledge-graph) ────────────────────────
+
+export type KGNodeKind = 'standard' | 'decision' | 'part'
+export type KGDecisionState = 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'SUPERSEDED'
+
+export interface KGNode {
+  id: string
+  label: string
+  kind: KGNodeKind
+  /** Layout x/y inside the 1000x600 viewBox. Hand-placed for premium feel. */
+  x: number
+  y: number
+  /** Optional metadata shown in the side drawer. */
+  meta?: string
+  state?: KGDecisionState
+  part_id?: string
+}
+
+export type KGEdgeKind = 'cites' | 'supersedes' | 'applies-to'
+
+export interface KGEdge {
+  id: string
+  from: string
+  to: string
+  kind: KGEdgeKind
+}
+
+/**
+ * Three vertical bands:
+ *   x ~ 130  → Standards (cited references)
+ *   x ~ 500  → Decisions (the active objects)
+ *   x ~ 870  → Parts (geometry the decisions apply to)
+ */
+export const SEED_KG_NODES: KGNode[] = [
+  // ── Standards (violet) ─────────────────────────────────────────────────
+  { id: 'std-as9100', label: 'AS9100 §6.4.3', kind: 'standard', x: 130, y: 90, meta: 'Quality mgmt — aerospace' },
+  { id: 'std-iso1101', label: 'ISO 1101', kind: 'standard', x: 130, y: 190, meta: 'Geometrical tolerances' },
+  { id: 'std-asme', label: 'ASME Y14.5 §1.4', kind: 'standard', x: 130, y: 290, meta: 'Dimensioning & tolerancing' },
+  { id: 'std-mil', label: 'MIL-STD-1916', kind: 'standard', x: 130, y: 390, meta: 'Sampling procedures' },
+  { id: 'std-din', label: 'DIN 6885', kind: 'standard', x: 130, y: 490, meta: 'Keyway dimensions' },
+
+  // ── Decisions (amber/emerald/rose by state) ───────────────────────────
+  { id: 'dec-turbo-04', label: 'DEC-TURBO-V3-04', kind: 'decision', state: 'SUPERSEDED', part_id: 'demo_1', x: 500, y: 70, meta: 'Boss chamfer (superseded)' },
+  { id: 'dec-turbo-08', label: 'DEC-TURBO-V3-08', kind: 'decision', state: 'ACCEPTED', part_id: 'demo_1', x: 500, y: 170, meta: 'Inlet flange Ra 1.6 µm' },
+  { id: 'dec-turbo-11', label: 'DEC-TURBO-V3-11', kind: 'decision', state: 'PROPOSED', part_id: 'demo_1', x: 500, y: 270, meta: 'Wall thickness 1.6 mm at Z3' },
+  { id: 'dec-bracket-07', label: 'DEC-BRACKET-07', kind: 'decision', state: 'ACCEPTED', part_id: 'demo_2', x: 500, y: 370, meta: 'Fillet radius R2.5 on load edge' },
+  { id: 'dec-bracket-09', label: 'DEC-BRACKET-09', kind: 'decision', state: 'PROPOSED', part_id: 'demo_2', x: 500, y: 470, meta: 'Bolt hole offset 0.3 mm' },
+  { id: 'dec-gear-12', label: 'DEC-GEAR-12', kind: 'decision', state: 'ACCEPTED', part_id: 'demo_3', x: 500, y: 540, meta: 'Spline tolerance 6f' },
+
+  // ── Parts (primary teal) ───────────────────────────────────────────────
+  { id: 'part-compressor', label: 'Compressor Housing v2', kind: 'part', part_id: 'demo_1', x: 870, y: 160, meta: 'demo_1 · Rev B · 3 decisions' },
+  { id: 'part-bracket', label: 'Wing Spar Bracket', kind: 'part', part_id: 'demo_2', x: 870, y: 380, meta: 'demo_2 · Rev B · 12 decisions' },
+  { id: 'part-turbine', label: 'Turbine Disk Hub', kind: 'part', part_id: 'demo_3', x: 870, y: 540, meta: 'demo_3 · Rev C · 5 decisions' },
+]
+
+export const SEED_KG_EDGES: KGEdge[] = [
+  // Standards cited by decisions
+  { id: 'e1', from: 'dec-turbo-11', to: 'std-as9100', kind: 'cites' },
+  { id: 'e2', from: 'dec-turbo-08', to: 'std-iso1101', kind: 'cites' },
+  { id: 'e3', from: 'dec-bracket-07', to: 'std-mil', kind: 'cites' },
+  { id: 'e4', from: 'dec-bracket-09', to: 'std-asme', kind: 'cites' },
+  { id: 'e5', from: 'dec-gear-12', to: 'std-iso1101', kind: 'cites' },
+  { id: 'e6', from: 'dec-gear-12', to: 'std-din', kind: 'cites' },
+  { id: 'e7', from: 'dec-turbo-11', to: 'std-asme', kind: 'cites' },
+
+  // Supersession (rare but important)
+  { id: 'e10', from: 'dec-turbo-08', to: 'dec-turbo-04', kind: 'supersedes' },
+
+  // Decisions → parts
+  { id: 'e20', from: 'dec-turbo-04', to: 'part-compressor', kind: 'applies-to' },
+  { id: 'e21', from: 'dec-turbo-08', to: 'part-compressor', kind: 'applies-to' },
+  { id: 'e22', from: 'dec-turbo-11', to: 'part-compressor', kind: 'applies-to' },
+  { id: 'e23', from: 'dec-bracket-07', to: 'part-bracket', kind: 'applies-to' },
+  { id: 'e24', from: 'dec-bracket-09', to: 'part-bracket', kind: 'applies-to' },
+  { id: 'e25', from: 'dec-gear-12', to: 'part-turbine', kind: 'applies-to' },
+]
+
 // ── Hash chain mocks (used by /audit/chain/[workspaceId] + /audit/export) ────
 
 export type HashChainEventKind =

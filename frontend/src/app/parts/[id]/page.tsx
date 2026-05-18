@@ -16,6 +16,7 @@ import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplai
 import PartViewTabs from '@/components/parts/PartViewTabs'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
+import { SEED_FULL_DECISIONS, SEED_MEMBERS } from '@/lib/mockWorkspace'
 import type {
   AnchorRead,
   Centroid,
@@ -66,6 +67,78 @@ function pickDominantDecision(decisions: DecisionRead[]): DecisionRead | null {
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max - 1).trimEnd() + '…'
+}
+
+// ── Mock-ID detection + seed-data builders ──────────────────────────────────
+
+/** Demo part IDs surfaced by the Project Hub Parts grid look like `demo_1`. */
+function isMockPartId(id: string): boolean {
+  return /^demo_[A-Za-z0-9_-]+$/.test(id)
+}
+
+/**
+ * Build a self-contained PartDetail for a demo id — name + file-name derived
+ * from any decision that references this part_id, with a stable fake hash.
+ * Field shape exactly matches the real /api/parts/{id} response so the rest
+ * of the page doesn't have to special-case anything.
+ */
+function buildMockPart(partId: string): PartDetail {
+  const sample = SEED_FULL_DECISIONS.find((d) => d.part_id === partId)
+  const name = sample?.part_name ?? partId
+  // Pseudo-deterministic 64-hex "content hash" so the header chip looks real.
+  let h = 0
+  for (let i = 0; i < partId.length; i++) h = (h * 31 + partId.charCodeAt(i)) >>> 0
+  const hash = (h.toString(16).padStart(8, '0') + '0').repeat(8).slice(0, 64)
+  return {
+    id: partId,
+    name,
+    file_name: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.step`,
+    content_hash: hash,
+    face_count: 0,
+    edge_count: 0,
+    owner_id: 'mock',
+    created_at: new Date().toISOString(),
+    file_url: '',
+    file_url_expires_in: 3600,
+  }
+}
+
+/**
+ * Synthesise DecisionRead[] for a demo part from SEED_FULL_DECISIONS. The
+ * resulting objects are shape-compatible with the real DecisionRead so the
+ * DecisionsPanel + CommentLabels render without any branching.
+ */
+function buildMockDecisions(partId: string): DecisionRead[] {
+  const memberById = new Map(SEED_MEMBERS.map((m) => [m.name, m]))
+  return SEED_FULL_DECISIONS.filter((d) => d.part_id === partId).map((d, i) => {
+    // Map our mock state union to the real DecisionState (DRAFT is API-only).
+    const state: DecisionState =
+      d.state === 'DRAFT' ? 'DRAFT' : (d.state as DecisionState)
+    const author = memberById.get(d.author_name)
+    // Spread anchor centroids over a small grid so pins don't stack.
+    const centroid = { x: -1 + (i % 3) * 0.8, y: ((i % 2) - 0.5) * 0.6, z: 0.5 }
+    return {
+      id: d.id,
+      part_id: partId,
+      anchor_id: d.anchor_id,
+      author_id: author?.id ?? 'mock',
+      state,
+      rationale: d.rationale,
+      accepted_at: state === 'ACCEPTED' ? d.created_at : null,
+      accepted_by_id: state === 'ACCEPTED' ? 'mock' : null,
+      created_at: d.created_at,
+      updated_at: d.created_at,
+      author:
+        author !== undefined
+          ? { id: author.id, name: author.name, email: author.email }
+          : null,
+      anchor: {
+        id: d.anchor_id,
+        face_uuid: d.anchor_id,
+        centroid,
+      },
+    }
+  })
 }
 
 // ── Partner-view redaction heuristic ────────────────────────────────────────
@@ -127,6 +200,38 @@ export default function PartPage() {
   useEffect(() => {
     if (!partId) return
     let cancelled = false
+
+    // ── Mock-ID fast path ────────────────────────────────────────────
+    // The Workspace → Project Hub flow surfaces part cards whose ids look
+    // like `demo_1`, `demo_2` (derived from SEED_FULL_DECISIONS). Those
+    // ids don't exist in the real backend, so a normal fetch would 404.
+    // For any id matching that mock shape we skip the API entirely and
+    // build a self-contained PartDetail + decisions list from seed data,
+    // so the same viewer renders with sample geometry.
+    if (isMockPartId(partId)) {
+      api.auth
+        .me()
+        .then((u) => {
+          if (cancelled) return
+          setUser(u)
+          setPart(buildMockPart(partId))
+          setDecisions(buildMockDecisions(partId))
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          if (err instanceof ApiError && err.status === 401) {
+            clearToken()
+            router.replace('/login')
+            return
+          }
+          setError(err instanceof Error ? err.message : 'Failed to load')
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // ── Real-backend fetch (unchanged) ──────────────────────────────
     Promise.all([api.auth.me(), api.parts.get(partId), api.decisions.list(partId)])
       .then(([u, p, d]) => {
         if (cancelled) return

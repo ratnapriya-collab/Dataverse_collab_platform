@@ -1208,6 +1208,153 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   orphaned: [],
 }
 
+// ── Hash chain mocks (used by /audit/chain/[workspaceId] + /audit/export) ────
+
+export type HashChainEventKind =
+  | 'WORKSPACE_GENESIS'
+  | 'MEMBER_JOINED'
+  | 'INVITE_CREATED'
+  | 'PART_UPLOADED'
+  | 'REV_UPLOADED'
+  | 'DECISION_PROPOSED'
+  | 'DECISION_ACCEPTED'
+  | 'DECISION_REJECTED'
+  | 'DECISION_SUPERSEDED'
+  | 'RESOLVER_COMPLETED'
+  | 'BUNDLE_SIGNED'
+  | 'PLM_PUSHED'
+
+export interface HashChainEvent {
+  seq: number
+  kind: HashChainEventKind
+  actor: string
+  /** 64-char hex string — SHA-256-shaped. */
+  prev_hash: string
+  curr_hash: string
+  created_at: string
+  payload: Record<string, unknown>
+}
+
+/**
+ * Deterministic 64-hex "hash" from an arbitrary seed. NOT cryptographically
+ * sound — just shaped like SHA-256 so the UI demo looks real.
+ */
+function fakeHash(seed: string): string {
+  let h1 = 5381
+  let h2 = 5381
+  let h3 = 5381
+  let h4 = 5381
+  for (let i = 0; i < seed.length; i++) {
+    const c = seed.charCodeAt(i)
+    h1 = ((h1 << 5) + h1 + c) >>> 0
+    h2 = ((h2 << 7) + h2 + seed.charCodeAt((i * 2) % seed.length)) >>> 0
+    h3 = ((h3 << 3) + h3 + seed.charCodeAt((i * 3) % seed.length)) >>> 0
+    h4 = ((h4 << 11) + h4 + seed.charCodeAt((i * 5) % seed.length)) >>> 0
+  }
+  const blocks = [
+    h1,
+    h2,
+    h3,
+    h4,
+    (h1 ^ h2) >>> 0,
+    (h3 ^ h4) >>> 0,
+    (h1 + h3) >>> 0,
+    (h2 + h4) >>> 0,
+  ]
+  return blocks.map((n) => (n >>> 0).toString(16).padStart(8, '0')).join('')
+}
+
+export const GENESIS_HASH = '0000000000000000000000000000000000000000000000000000000000000000'
+const GENESIS_AT = new Date(NOW - 60 * DAYS).toISOString()
+
+/** Build the 25-event chain at module load. Each event chains to the previous. */
+function buildHashChain(): HashChainEvent[] {
+  const raw: Array<Omit<HashChainEvent, 'prev_hash' | 'curr_hash' | 'seq'>> = [
+    { kind: 'WORKSPACE_GENESIS', actor: 'system', created_at: GENESIS_AT, payload: { workspace: 'f-bracket' } },
+    { kind: 'MEMBER_JOINED', actor: 'Ratnapriya Chamala', created_at: new Date(NOW - 58 * DAYS).toISOString(), payload: { role: 'ADMIN' } },
+    { kind: 'MEMBER_JOINED', actor: 'David Kim', created_at: new Date(NOW - 57 * DAYS).toISOString(), payload: { role: 'ADMIN' } },
+    { kind: 'INVITE_CREATED', actor: 'Ratnapriya Chamala', created_at: new Date(NOW - 56 * DAYS).toISOString(), payload: { email: 'sarah.chen@oem-aero.com', role: 'MEMBER' } },
+    { kind: 'MEMBER_JOINED', actor: 'Sarah Chen', created_at: new Date(NOW - 55 * DAYS).toISOString(), payload: { role: 'MEMBER', team: 'CAE' } },
+    { kind: 'PART_UPLOADED', actor: 'Sarah Chen', created_at: new Date(NOW - 30 * DAYS).toISOString(), payload: { part_id: 'demo_1', name: 'Compressor Housing v2', rev: 'Rev A', size_bytes: 4_192_000 } },
+    { kind: 'DECISION_PROPOSED', actor: 'Sarah Chen', created_at: new Date(NOW - 28 * DAYS).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-04', anchor_id: 'face-boss-7' } },
+    { kind: 'DECISION_ACCEPTED', actor: 'David Kim', created_at: new Date(NOW - 27 * DAYS).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-04', signed_by: ['David Kim'] } },
+    { kind: 'PART_UPLOADED', actor: 'John Williams', created_at: new Date(NOW - 25 * DAYS).toISOString(), payload: { part_id: 'demo_2', name: 'Wing Spar Bracket', rev: 'Rev A' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Sarah Chen', created_at: new Date(NOW - 22 * DAYS).toISOString(), payload: { decision_id: 'DEC-BRACKET-05', anchor_id: 'face-rib-4' } },
+    { kind: 'DECISION_REJECTED', actor: 'David Kim', created_at: new Date(NOW - 21 * DAYS).toISOString(), payload: { decision_id: 'DEC-BRACKET-05', reason: 'harness routing interference' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Maria Garcia', created_at: new Date(NOW - 18 * DAYS).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-08', anchor_id: 'face-flange-1' } },
+    { kind: 'DECISION_SUPERSEDED', actor: 'Maria Garcia', created_at: new Date(NOW - 17 * DAYS).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-04', superseded_by: 'DEC-TURBO-V3-08' } },
+    { kind: 'DECISION_ACCEPTED', actor: 'David Kim', created_at: new Date(NOW - 16 * DAYS).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-08', signed_by: ['Sarah Chen', 'David Kim'] } },
+    { kind: 'REV_UPLOADED', actor: 'Sarah Chen', created_at: new Date(NOW - 12 * DAYS).toISOString(), payload: { part_id: 'demo_2', from_rev: 'Rev A', to_rev: 'Rev B' } },
+    { kind: 'RESOLVER_COMPLETED', actor: 'system', created_at: new Date(NOW - 12 * DAYS + 60_000).toISOString(), payload: { part_id: 'demo_2', auto_carried: 12, requires_confirmation: 3, regressed: 1 } },
+    { kind: 'DECISION_PROPOSED', actor: 'John Williams', created_at: new Date(NOW - 10 * DAYS).toISOString(), payload: { decision_id: 'DEC-BRACKET-09', anchor_id: 'hole-bolt-3' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Sarah Chen', created_at: new Date(NOW - 8 * DAYS).toISOString(), payload: { decision_id: 'DEC-BRACKET-07', anchor_id: 'edge-fillet-2' } },
+    { kind: 'DECISION_ACCEPTED', actor: 'David Kim', created_at: new Date(NOW - 7 * DAYS).toISOString(), payload: { decision_id: 'DEC-BRACKET-07' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Maria Garcia', created_at: new Date(NOW - 5 * DAYS).toISOString(), payload: { decision_id: 'DEC-PLATE-04' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Ratnapriya Chamala', created_at: new Date(NOW - 4 * 3_600_000).toISOString(), payload: { decision_id: 'DEC-PLATE-02' } },
+    { kind: 'DECISION_PROPOSED', actor: 'Sarah Chen', created_at: new Date(NOW - 30 * 60_000).toISOString(), payload: { decision_id: 'DEC-TURBO-V3-11', anchor_id: 'face-boss-7' } },
+    { kind: 'DECISION_PROPOSED', actor: 'John Williams', created_at: new Date(NOW - 2 * 3_600_000).toISOString(), payload: { decision_id: 'DEC-BRACKET-09' } },
+    { kind: 'BUNDLE_SIGNED', actor: 'system', created_at: new Date(NOW - 1 * 3_600_000).toISOString(), payload: { bundle: 'dvex-fbracket-2026-05-18.json', algo: 'Ed25519', fingerprint: '7f3a:b2e1:c8d5:9e2d' } },
+    { kind: 'PLM_PUSHED', actor: 'Ratnapriya Chamala', created_at: new Date(NOW - 30 * 60_000).toISOString(), payload: { ecn: 'ECN-2026-0412', target: 'Windchill 12.1' } },
+  ]
+
+  let prev = GENESIS_HASH
+  return raw.map((ev, idx) => {
+    const seq = idx + 1
+    const seed = `${prev}|${seq}|${ev.kind}|${ev.actor}|${JSON.stringify(ev.payload)}|${ev.created_at}`
+    const curr = fakeHash(seed)
+    const built: HashChainEvent = {
+      seq,
+      kind: ev.kind,
+      actor: ev.actor,
+      created_at: ev.created_at,
+      payload: ev.payload,
+      prev_hash: prev,
+      curr_hash: curr,
+    }
+    prev = curr
+    return built
+  })
+}
+
+export const SEED_HASH_CHAIN: HashChainEvent[] = buildHashChain()
+
+// DVEX bundle metadata (used by /audit/export + the verified-bundle banner).
+export interface MockDvexBundle {
+  schema: 'dvex/v1.0'
+  workspace_slug: string
+  workspace_name: string
+  events_count: number
+  exported_at: string
+  /** First event's curr_hash so external verifiers can chain from genesis. */
+  genesis_hash: string
+  /** Most recent event's curr_hash — chain tip. */
+  tip_hash: string
+  signature: {
+    algo: 'Ed25519'
+    fingerprint: string
+    pubkey_pem_filename: string
+  }
+  filename: string
+  size_bytes: number
+}
+
+export const SEED_DVEX_BUNDLE: MockDvexBundle = {
+  schema: 'dvex/v1.0',
+  workspace_slug: 'f-bracket',
+  workspace_name: 'F-Bracket Program',
+  events_count: SEED_HASH_CHAIN.length,
+  exported_at: new Date(NOW - 1 * 3_600_000).toISOString(),
+  genesis_hash: SEED_HASH_CHAIN[0]?.curr_hash ?? '',
+  tip_hash: SEED_HASH_CHAIN[SEED_HASH_CHAIN.length - 1]?.curr_hash ?? '',
+  signature: {
+    algo: 'Ed25519',
+    fingerprint: '7f3a:b2e1:c8d5:9e2d:0a4f:6b81:c2d3:e4f5',
+    pubkey_pem_filename: 'dvex-fbracket-pubkey.pem',
+  },
+  filename: 'dvex-fbracket-2026-05-18.json',
+  size_bytes: 847_360,
+}
+
 // ── PLM connection + ECN mocks (used by /parts/[id]/plm-push) ────────────────
 
 export type PlmConnectionStatus = 'connected' | 'syncing' | 'error' | 'disconnected'

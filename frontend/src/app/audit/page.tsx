@@ -8,6 +8,7 @@
  * an expandable JSON payload for forensic-style detail.
  */
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -333,6 +334,45 @@ export default function AuditPage() {
               </button>
             </div>
           </div>
+
+          {/* Audit sub-nav */}
+          <nav
+            aria-label="Audit sections"
+            className="dv-anim-fade-up mt-5 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+            style={{ animationDelay: '60ms' }}
+          >
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-sm">
+              <History className="h-3 w-3" />
+              Timeline
+            </span>
+            <Link
+              href="/audit/chain/f-bracket"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-primary-50 hover:text-primary"
+            >
+              <GitBranch className="h-3 w-3" />
+              Hash chain
+              <span className="ml-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-slate-600">
+                25
+              </span>
+            </Link>
+            <Link
+              href="/audit/export"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-primary-50 hover:text-primary"
+            >
+              <Send className="h-3 w-3" />
+              Export bundle
+            </Link>
+            <Link
+              href="/audit/replay-tool"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-primary-50 hover:text-primary"
+            >
+              <FileText className="h-3 w-3" />
+              Replay tool
+            </Link>
+            <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">
+              ✓ chain verified
+            </span>
+          </nav>
 
           {/* Stats */}
           <div className="dv-anim-fade-up mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" style={{ animationDelay: '80ms' }}>

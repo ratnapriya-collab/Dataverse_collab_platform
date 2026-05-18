@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { LayoutGrid, Plus } from 'lucide-react'
+import { LayoutGrid, Plus, X } from 'lucide-react'
 import ProjectCard from './ProjectCard'
 import type { MockProject, ProjectStatus } from '@/lib/mockWorkspace'
 
@@ -82,6 +82,33 @@ export default function ProjectsGrid({ projects }: Props) {
             </button>
           )
         })}
+
+        {/* "Clear filter" only appears when user has narrowed the view —
+            keeps the active filter discoverable from any page-scroll position. */}
+        {filter !== 'ALL' && (
+          <button
+            type="button"
+            onClick={() => setFilter('ALL')}
+            className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+            aria-label="Clear filter and show all projects"
+          >
+            <X className="h-2.5 w-2.5" />
+            Clear filter
+          </button>
+        )}
+
+        {/* "Showing N of M" indicator — always present, sits at the right
+            edge. Removes any ambiguity that the grid is showing a subset. */}
+        <span
+          className="ml-auto inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
+          aria-live="polite"
+        >
+          Showing{' '}
+          <strong className="font-bold tabular-nums text-slate-900">
+            {filtered.length}
+          </strong>{' '}
+          of {projects.length}
+        </span>
       </div>
 
       {/* Grid */}

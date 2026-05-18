@@ -193,9 +193,9 @@ export default function WorkspacePage() {
           <div className="dv-anim-fade-up" style={{ animationDelay: '80ms' }}>
             <StatCard
               icon={FolderKanban}
-              label="Active projects"
-              value={activeProjects}
-              hint={`${SEED_PROJECTS.length} total`}
+              label="Projects in workspace"
+              value={SEED_PROJECTS.length}
+              hint={`${activeProjects} active · ${SEED_PROJECTS.length - activeProjects} done`}
               accent="text-violet-600"
               accentBg="bg-violet-50"
               trend={[2, 3, 3, 2, 4, 3, 4]}

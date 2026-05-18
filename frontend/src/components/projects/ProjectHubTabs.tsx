@@ -8,9 +8,9 @@
  * rest are subtle.
  */
 
-import { FileBox, History, MessageSquare, Users } from 'lucide-react'
+import { ClipboardList, FileBox, History, MessageSquare, Users } from 'lucide-react'
 
-export type ProjectHubTab = 'parts' | 'decisions' | 'activity' | 'members'
+export type ProjectHubTab = 'parts' | 'decisions' | 'feedback' | 'activity' | 'members'
 
 interface Props {
   active: ProjectHubTab
@@ -27,6 +27,7 @@ interface TabSpec {
 const TABS: TabSpec[] = [
   { id: 'parts', label: 'Parts', icon: FileBox },
   { id: 'decisions', label: 'Decisions', icon: MessageSquare },
+  { id: 'feedback', label: 'Feedback', icon: ClipboardList },
   { id: 'activity', label: 'Activity', icon: History },
   { id: 'members', label: 'Members', icon: Users },
 ]

@@ -26,6 +26,7 @@ import NotificationsBell from '@/components/layout/NotificationsBell'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import ProjectHubHero from '@/components/projects/ProjectHubHero'
 import ProjectHubTabs, { type ProjectHubTab } from '@/components/projects/ProjectHubTabs'
+import FeedbackPanel from '@/components/feedback/FeedbackPanel'
 import Avatar from '@/components/workspace/Avatar'
 import TeamBadge from '@/components/workspace/TeamBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
@@ -155,6 +156,7 @@ export default function ProjectHubPage(): JSX.Element {
   const counts: Record<ProjectHubTab, number> = {
     parts: parts.length,
     decisions: decisions.length,
+    feedback: decisions.length, // every decision is a feedback row
     activity: activity.length,
     members: projectMembers.length,
   }
@@ -203,6 +205,9 @@ export default function ProjectHubPage(): JSX.Element {
           <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '160ms' }} key={tab}>
             {tab === 'parts' && <PartsTab parts={parts} />}
             {tab === 'decisions' && <DecisionsTab decisions={decisions} />}
+            {tab === 'feedback' && (
+              <FeedbackPanel decisions={decisions} currentUserName={user.name} />
+            )}
             {tab === 'activity' && <ActivityTab activity={activity} />}
             {tab === 'members' && <MembersTab members={projectMembers} projectName={project.name} />}
           </div>

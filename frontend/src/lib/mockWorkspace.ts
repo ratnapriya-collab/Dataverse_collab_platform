@@ -914,6 +914,24 @@ export type FullDecisionState =
   | 'REJECTED'
   | 'SUPERSEDED'
 
+/** Priority bucket on the Feedback issue tracker. */
+export type IssuePriority = 'low' | 'medium' | 'high' | 'blocker'
+
+/** Preset issue tags — CoLab-style colored labels on the feedback table. */
+export type IssueTag =
+  | 'DFM'
+  | 'Manufacturing'
+  | 'Machining'
+  | 'Tolerancing'
+  | 'Sourcing'
+  | 'Materials'
+  | 'Complexity: High'
+  | 'Complexity: Medium'
+  | 'Complexity: Low'
+  | 'Blocker'
+  | 'Cost Reduction'
+  | 'VAVE'
+
 export interface MockFullDecision {
   id: string
   project_id: string
@@ -928,6 +946,15 @@ export interface MockFullDecision {
   citations: string[]
   created_at: string
   signoff_progress?: { responded: number; total: number }
+  // ── Feedback / issue-tracker fields (CoLab-style) ────────────────
+  /** Short headline used by the issue table — derives from rationale if absent. */
+  title?: string
+  /** Multi-select labels grouped on the feedback table. */
+  tags?: IssueTag[]
+  /** Triage priority; absence means unset (rendered as "—"). */
+  priority?: IssuePriority
+  /** Person responsible for resolving it (separate from the author). */
+  assignee_name?: string
 }
 
 export const SEED_FULL_DECISIONS: MockFullDecision[] = [
@@ -946,6 +973,10 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['AS9100 §6.4.3', 'DEC-TURBO-V3-08'],
     created_at: new Date(NOW - 25 * 60_000).toISOString(),
     signoff_progress: { responded: 1, total: 3 },
+    title: 'Wall thickness 1.6 mm at Z3 below 2.0 mm minimum',
+    tags: ['DFM', 'Complexity: High'],
+    priority: 'high',
+    assignee_name: 'Naga Reddy',
   },
   {
     id: 'DEC-BRACKET-09',
@@ -962,6 +993,10 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['ASME Y14.5 §1.4', 'DRW-BRACKET-B'],
     created_at: new Date(NOW - 2 * 3_600_000).toISOString(),
     signoff_progress: { responded: 0, total: 4 },
+    title: 'Bolt hole pattern offset by 0.3 mm',
+    tags: ['Tolerancing', 'Blocker'],
+    priority: 'blocker',
+    assignee_name: 'David Kim',
   },
   {
     id: 'DEC-TURBO-V3-08',
@@ -978,6 +1013,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['ISO 1101', 'GASKET-DS-9911'],
     created_at: new Date(NOW - 1 * DAYS).toISOString(),
     signoff_progress: { responded: 3, total: 3 },
+    title: 'Inlet flange surface tightened to Ra 1.6 µm',
+    tags: ['Manufacturing', 'Materials'],
+    priority: 'medium',
   },
   {
     id: 'DEC-BRACKET-07',
@@ -994,6 +1032,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['CAE-RUN-2026-04-11', 'MIL-STD-1916'],
     created_at: new Date(NOW - 2 * DAYS).toISOString(),
     signoff_progress: { responded: 4, total: 4 },
+    title: 'Fillet radius R1.5 → R2.5 on load edge',
+    tags: ['Materials', 'Complexity: Medium'],
+    priority: 'medium',
   },
   {
     id: 'DEC-GEAR-12',
@@ -1010,6 +1051,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['ICD-GEARBOX-V3', 'CMM-2026-05-04'],
     created_at: new Date(NOW - 3 * DAYS).toISOString(),
     signoff_progress: { responded: 3, total: 3 },
+    title: 'Spline tolerance class 7e → 6f',
+    tags: ['Tolerancing', 'Machining'],
+    priority: 'medium',
   },
   {
     id: 'DEC-BRACKET-05',
@@ -1025,6 +1069,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     author_team: 'SUPPLIER',
     citations: ['HARNESS-DRW-2208'],
     created_at: new Date(NOW - 5 * DAYS).toISOString(),
+    title: 'Rib relocation rejected (harness clash)',
+    tags: ['DFM'],
+    priority: 'low',
   },
   {
     id: 'DEC-PLATE-04',
@@ -1041,6 +1088,10 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['OSHA-1910.23'],
     created_at: new Date(NOW - 9 * 3_600_000).toISOString(),
     signoff_progress: { responded: 1, total: 2 },
+    title: 'Deburr plate edges 0.2 × 45° (operator safety)',
+    tags: ['Manufacturing'],
+    priority: 'low',
+    assignee_name: 'David Kim',
   },
   {
     id: 'DEC-PLATE-02',
@@ -1057,6 +1108,10 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['ASME Y14.5 §1.4', 'CAE-RUN-2026-05-08'],
     created_at: new Date(NOW - 4 * 3_600_000).toISOString(),
     signoff_progress: { responded: 1, total: 3 },
+    title: 'Centre-to-centre tolerance ±0.05 → ±0.10 mm',
+    tags: ['Tolerancing', 'Sourcing', 'Cost Reduction'],
+    priority: 'medium',
+    assignee_name: 'Maria Garcia',
   },
   {
     id: 'DEC-INTAKE-01',
@@ -1073,6 +1128,10 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['CFD-RUN-2026-05-10', 'ASHRAE-HX-V3'],
     created_at: new Date(NOW - 6 * 3_600_000).toISOString(),
     signoff_progress: { responded: 0, total: 3 },
+    title: 'Fin spacing 4.0 → 3.2 mm for +12 % thermal transfer',
+    tags: ['Complexity: High', 'Manufacturing'],
+    priority: 'high',
+    assignee_name: 'Sarah Chen',
   },
   {
     id: 'DEC-TURBO-V3-04',
@@ -1088,6 +1147,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     author_team: 'REVIEWER',
     citations: [],
     created_at: new Date(NOW - 9 * DAYS).toISOString(),
+    title: 'Boss chamfer (superseded by DEC-TURBO-V3-08)',
+    tags: ['Manufacturing'],
+    priority: 'low',
   },
   {
     id: 'DEC-GEAR-08',
@@ -1104,6 +1166,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['DIN 6885', 'COUPLING-MOTOR-SIDE-V2'],
     created_at: new Date(NOW - 8 * DAYS).toISOString(),
     signoff_progress: { responded: 3, total: 3 },
+    title: 'Keyway dimensions confirmed to DIN 6885',
+    tags: ['Machining', 'Tolerancing'],
+    priority: 'medium',
   },
   {
     id: 'DEC-COOLING-01',
@@ -1120,6 +1185,9 @@ export const SEED_FULL_DECISIONS: MockFullDecision[] = [
     citations: ['ISO 228-1'],
     created_at: new Date(NOW - 35 * DAYS).toISOString(),
     signoff_progress: { responded: 2, total: 2 },
+    title: 'Port diameter standardised to G1/2" BSPP',
+    tags: ['Sourcing', 'Manufacturing', 'VAVE'],
+    priority: 'low',
   },
 ]
 

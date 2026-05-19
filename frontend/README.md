@@ -54,7 +54,6 @@ Click any face on the 3D model → propose a decision → it's anchored to that 
 | `/decisions` | Workspace-wide decision feed · Feed / Table view toggle |
 | `/audit` | Vertical timeline of every event |
 | `/admin` | Members · Invites · Settings |
-| `/architecture` | **System overview** — clickable module map |
 
 ### Part viewer (the centerpiece)
 
@@ -86,8 +85,6 @@ Click any face on the 3D model → propose a decision → it's anchored to that 
 ---
 
 ## Architecture overview
-
-Open **`/architecture`** for an interactive module map. Click any module → details drawer with deep-link to the mocked UI page.
 
 ```
 USER SURFACE     M1 Auth   M6 Admin   M3 Projects   M2 Parts/Viewer

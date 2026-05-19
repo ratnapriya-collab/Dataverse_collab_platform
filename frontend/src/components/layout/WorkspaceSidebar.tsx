@@ -26,6 +26,7 @@ import {
   Home,
   Inbox,
   LogOut,
+  Network,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
@@ -41,6 +42,7 @@ export type SidebarSection =
   | 'decisions'
   | 'audit'
   | 'admin'
+  | 'architecture'
 
 interface NavItem {
   id: SidebarSection
@@ -115,6 +117,12 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
       icon: Crown,
       href: '/admin',
       iconAccent: 'text-primary',
+    },
+    {
+      id: 'architecture',
+      label: 'Architecture',
+      icon: Network,
+      href: '/architecture',
     },
   ]
 

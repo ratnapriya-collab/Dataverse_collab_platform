@@ -1276,6 +1276,257 @@ export const SEED_RESOLVER_RESULT: MockResolverResult = {
   orphaned: [],
 }
 
+// ── Architecture overview (used by /architecture) ────────────────────────────
+
+export type ModuleStatus = 'live' | 'mocked' | 'planned'
+export type ModuleLayer = 'surface' | 'core' | 'cross' | 'planned'
+
+export interface ArchitectureModule {
+  id: string
+  /** Short display label, e.g. "M5 · Resolver". */
+  label: string
+  /** Full title shown in the drawer. */
+  title: string
+  status: ModuleStatus
+  layer: ModuleLayer
+  /** SVG x/y inside the 1100x700 viewBox. Hand-placed for clarity. */
+  x: number
+  y: number
+  /** One-paragraph blurb shown in the side drawer. */
+  description: string
+  /** Bullet-list of what the module does. */
+  features: string[]
+  /** Deep-link to the mocked UI page (omit for Planned modules). */
+  href?: string
+}
+
+export interface ArchitectureEdge {
+  id: string
+  from: string
+  to: string
+  /** Short verb shown on the midpoint of the edge. */
+  label: string
+}
+
+export const SEED_MODULES: ArchitectureModule[] = [
+  // ── Layer 1: User-facing surfaces ──────────────────────────────────────
+  {
+    id: 'M1',
+    label: 'M1 · Auth + Workspace',
+    title: 'M1 · Authentication & Workspace',
+    status: 'live',
+    layer: 'surface',
+    x: 120,
+    y: 90,
+    description:
+      'Email + password login backed by Python-JOSE JWTs (7-day expiry). Auto-creates a workspace on signup; users land on /workspace.',
+    features: [
+      'Login / register / forgot-password flows',
+      'Workspace dashboard with project grid',
+      'Stat tiles · activity feed · team card',
+      'Sign-out clears localStorage token',
+    ],
+    href: '/workspace',
+  },
+  {
+    id: 'M6',
+    label: 'M6 · Admin',
+    title: 'M6 · Workspace Administration',
+    status: 'live',
+    layer: 'surface',
+    x: 370,
+    y: 90,
+    description:
+      'Members, invites, role management and workspace settings. Three tabs: Members · Invites · Settings.',
+    features: [
+      'Role dropdown per member (ADMIN / MEMBER / VIEWER)',
+      'Generate-invite modal with stable codes',
+      'Audit-history placeholder (deep-links to /audit)',
+      'Workspace name + description editor',
+    ],
+    href: '/admin',
+  },
+  {
+    id: 'M3',
+    label: 'M3 · Projects',
+    title: 'M3 · Project Collaboration Hub',
+    status: 'live',
+    layer: 'surface',
+    x: 620,
+    y: 90,
+    description:
+      'Open a project → land in a CoLab-style hub with five tabs. The natural bridge between the workspace and the part viewer.',
+    features: [
+      'Hero with status pill, pipeline strip, avatar stack',
+      'Parts grid → links to each /parts/[id]',
+      'Project-scoped Decisions + Feedback (issue tracker)',
+      'Activity timeline · Members view',
+    ],
+    href: '/projects/proj_turbo',
+  },
+  {
+    id: 'M2',
+    label: 'M2 · Parts + Viewer',
+    title: 'M2 · Parts, 3D Viewer, 2D Drawing & BOM',
+    status: 'live',
+    layer: 'surface',
+    x: 920,
+    y: 90,
+    description:
+      'The centerpiece. Upload a STEP/GLB → click any face → propose a decision. Three views per part (3D · 2D · BOM) with the conversation hub anchored on the right.',
+    features: [
+      'Babylon.js viewer with topology-hash face IDs',
+      '2D engineering drawing canvas with PMI callouts',
+      'BOM tree with collapsible subassemblies',
+      'Stay-in-viewer conversation hub (Comments · Issues · Activity · Threads)',
+    ],
+    href: '/parts/demo_1',
+  },
+
+  // ── Layer 2: Core logic ────────────────────────────────────────────────
+  {
+    id: 'M4',
+    label: 'M4 · Decisions',
+    title: 'M4 · Decisions + Feedback',
+    status: 'live',
+    layer: 'core',
+    x: 260,
+    y: 270,
+    description:
+      'Decisions are first-class objects anchored to geometry, with a strict state machine and mandatory rationale. Surfaced as both a free-form list (Decisions) and an issue tracker (Feedback).',
+    features: [
+      'DRAFT → PROPOSED → ACCEPTED / REJECTED / SUPERSEDED',
+      '4-layer mandatory rationale gate (≥ 10 chars, server-enforced)',
+      'Feedback issue tracker — tags, priority, assignee, CSV export',
+      '@mention + person-tag picker on every decision',
+    ],
+    href: '/decisions',
+  },
+  {
+    id: 'M5',
+    label: 'M5 · Resolver',
+    title: 'M5 · Cross-Rev Resolver',
+    status: 'mocked',
+    layer: 'core',
+    x: 555,
+    y: 270,
+    description:
+      'The unfair-advantage feature. When a new revision lands, the resolver re-anchors every prior decision in 3 layers (face_uuid → topology fingerprint → proximity) and reports what carried, what regressed, what needs review.',
+    features: [
+      '5 buckets: auto-carried · needs confirmation · resolved · regressed · orphaned',
+      'Per-row confidence pill (green ≥ 0.95 / amber / orange / red)',
+      'Side-by-side Rev A / Rev B verify modal',
+      'Resolver-report JSON export',
+    ],
+    href: '/parts/demo_2/what-changed',
+  },
+  {
+    id: 'M9',
+    label: 'M9 · PLM Push',
+    title: 'M9 · PLM Adapter (Windchill)',
+    status: 'mocked',
+    layer: 'core',
+    x: 850,
+    y: 270,
+    description:
+      'Bundles ACCEPTED decisions into an Engineering Change Notice and pushes to the customer PLM (Windchill 12.1 in this demo) with a signed audit-bundle attached.',
+    features: [
+      '3-column wizard: decisions · ECN preview · sync status',
+      'Auto-classified Class II ECN draft',
+      'Signed DVEX bundle attached as evidence',
+      'External Windchill view at /external/windchill/ecn/[id]',
+    ],
+    href: '/parts/demo_2/plm-push',
+  },
+
+  // ── Layer 3: Cross-cutting / infrastructure ───────────────────────────
+  {
+    id: 'M7',
+    label: 'M7 · Audit Chain',
+    title: 'M7 · Append-only Hash Chain + DVEX Bundle',
+    status: 'mocked',
+    layer: 'cross',
+    x: 260,
+    y: 460,
+    description:
+      'Tamper-evident audit log of every workspace event, hashed SHA-256 with prev→curr chaining. Exportable as a signed DVEX bundle that an external auditor can verify offline.',
+    features: [
+      'Event chain view at /audit/chain/[workspace]',
+      '"Verify chain now" animation re-validates every event',
+      'DVEX bundle export with Ed25519 signature',
+      'Replay-tool docs at /audit/replay-tool',
+    ],
+    href: '/audit/chain/f-bracket',
+  },
+  {
+    id: 'M8',
+    label: 'M8 · Datum (AI)',
+    title: 'M8 · Datum — AI Co-pilot',
+    status: 'mocked',
+    layer: 'cross',
+    x: 555,
+    y: 460,
+    description:
+      'The AI layer. Suggests rationales, runs the supplier concierge tour, and screens content across the OEM-supplier boundary so internal cost-talk never leaks.',
+    features: [
+      '"Suggest rationale" button in Create Decision modal',
+      '7-step concierge tour with typewriter effect',
+      'Partner-view redaction (3 rules: internal-flag · cost-keywords · admin-only-threads)',
+      'Datum-screened comment cards visible to admin',
+    ],
+    href: '/parts/demo_2/concierge',
+  },
+
+  // ── Layer 4: Planned ───────────────────────────────────────────────────
+  {
+    id: 'NOTIFY',
+    label: 'Notify Bus',
+    title: 'Notify Bus · Planned',
+    status: 'planned',
+    layer: 'planned',
+    x: 320,
+    y: 620,
+    description:
+      'Realtime event bus for cross-user notifications (decision proposed → ping the assignee). Will plug into the existing event chain as a downstream consumer; design draft in progress.',
+    features: [
+      'WebSocket fan-out to all connected clients in a workspace',
+      'Per-user notification queue with read/unread state',
+      'Slack + email bridges (optional integrations)',
+      'Pings @mentions in real time',
+    ],
+  },
+  {
+    id: 'KG',
+    label: 'Knowledge Graph',
+    title: 'Knowledge Graph · Planned',
+    status: 'planned',
+    layer: 'planned',
+    x: 730,
+    y: 620,
+    description:
+      'Long-term: graph database linking standards, decisions, parts, suppliers and engineers. Removed from the current UI because CoLab does not have an equivalent — will return when there is a concrete user-job that needs cross-workspace navigation.',
+    features: [
+      'Nodes: decisions · standards · parts · authors · projects',
+      'Edges: cites · supersedes · applies-to · owned-by',
+      'Powers "who cites this standard across the org" queries',
+      'Foundation for Datum knowledge retrieval (RAG over decisions)',
+    ],
+  },
+]
+
+export const SEED_MODULE_EDGES: ArchitectureEdge[] = [
+  { id: 'e1', from: 'M2', to: 'M4', label: 'face pick' },
+  { id: 'e2', from: 'M4', to: 'M5', label: 're-anchor' },
+  { id: 'e3', from: 'M4', to: 'M7', label: 'log event' },
+  { id: 'e4', from: 'M5', to: 'M7', label: 'log run' },
+  { id: 'e5', from: 'M4', to: 'M9', label: 'push ECN' },
+  { id: 'e6', from: 'M9', to: 'M7', label: 'sign + log' },
+  { id: 'e7', from: 'M4', to: 'M8', label: 'suggest' },
+  { id: 'e8', from: 'M3', to: 'M2', label: 'open part' },
+  { id: 'e9', from: 'M1', to: 'M3', label: 'enter' },
+  { id: 'e10', from: 'M6', to: 'M1', label: 'invite' },
+]
+
 // ── 2D drawing PMI callouts (used by /parts/[id]/drawing) ────────────────────
 
 export type PMISymbol = 'diameter' | 'flatness' | 'concentricity' | 'position' | 'parallelism' | 'perpendicularity' | 'surface'

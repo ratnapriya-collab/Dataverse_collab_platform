@@ -57,13 +57,61 @@ export function useBookmarks(projectId: string): BookmarksApi {
       setBookmarks((prev) => {
         const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
         persist(next)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('dataverse:bookmarks-changed', {
+              detail: { projectId, bookmarks: next },
+            }),
+          )
+        }
         return next
       })
     },
-    [persist],
+    [persist, projectId],
   )
 
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks])
 
   return { bookmarks, isBookmarked, toggle }
+}
+
+/**
+ * useAllBookmarks — reads every `dataverse.bookmarks.*` key out of
+ * localStorage and returns the flattened list. Re-reads whenever any
+ * project's useBookmarks toggles (via the custom event), and on cross-tab
+ * `storage` events.
+ */
+export function useAllBookmarks(): Array<{ projectId: string; widgetId: string }> {
+  const [items, setItems] = useState<Array<{ projectId: string; widgetId: string }>>([])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const load = (): void => {
+      const result: Array<{ projectId: string; widgetId: string }> = []
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i)
+        if (key === null || !key.startsWith(STORAGE_PREFIX)) continue
+        const projectId = key.slice(STORAGE_PREFIX.length)
+        try {
+          const arr = JSON.parse(window.localStorage.getItem(key) ?? '[]')
+          if (!Array.isArray(arr)) continue
+          for (const widgetId of arr) {
+            if (typeof widgetId === 'string') result.push({ projectId, widgetId })
+          }
+        } catch {
+          // skip malformed entries
+        }
+      }
+      setItems(result)
+    }
+    load()
+    window.addEventListener('storage', load)
+    window.addEventListener('dataverse:bookmarks-changed', load)
+    return () => {
+      window.removeEventListener('storage', load)
+      window.removeEventListener('dataverse:bookmarks-changed', load)
+    }
+  }, [])
+
+  return items
 }

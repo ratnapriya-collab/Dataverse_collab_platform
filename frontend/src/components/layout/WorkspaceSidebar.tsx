@@ -41,6 +41,8 @@ import {
 } from 'lucide-react'
 import { HexMark } from '@/components/ui/Logo'
 import Avatar from '@/components/workspace/Avatar'
+import { CARD_TITLES, type CardId } from '@/components/projects/ProjectOverviewTab'
+import { useAllBookmarks } from '@/hooks/useBookmarks'
 import { SEED_PROJECTS, SEED_WORK_ITEMS } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
@@ -112,6 +114,7 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
   }, [])
 
   const assignedToYou = SEED_WORK_ITEMS.filter((w) => w.tab === 'assigned').length
+  const allBookmarks = useAllBookmarks()
 
   const items: NavItem[] = [
     { id: 'dashboard', label: 'My Overview', icon: Activity, href: '/workspace' },
@@ -437,10 +440,43 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="px-2 py-3 text-center text-[10.5px] text-slate-400">
+            ) : allBookmarks.length === 0 ? (
+              <div className="px-2 py-4 text-center text-[10.5px] text-slate-400">
                 No bookmarks yet
+                <p className="mt-1 text-[9.5px] leading-relaxed text-slate-400">
+                  Bookmark a widget from a project&apos;s Overviews tab to see it
+                  pinned here.
+                </p>
               </div>
+            ) : (
+              <ul className="space-y-0.5">
+                {allBookmarks.map(({ projectId, widgetId }) => {
+                  const project = SEED_PROJECTS.find((p) => p.id === projectId)
+                  const widgetLabel =
+                    widgetId in CARD_TITLES ? CARD_TITLES[widgetId as CardId] : widgetId
+                  return (
+                    <li key={`${projectId}:${widgetId}`}>
+                      <Link
+                        href={`/projects/${projectId}?tab=pins`}
+                        className="flex items-start gap-2 rounded-md px-2 py-1.5 transition hover:bg-slate-100/70"
+                      >
+                        <Pin
+                          className="mt-0.5 h-3 w-3 shrink-0 -rotate-12 text-rose-500"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11.5px] font-semibold text-slate-700">
+                            {widgetLabel}
+                          </p>
+                          <p className="truncate text-[9.5px] text-slate-400">
+                            {project?.name ?? projectId}
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </div>
         )}

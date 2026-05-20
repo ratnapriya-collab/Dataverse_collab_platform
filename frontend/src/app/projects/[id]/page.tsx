@@ -19,7 +19,7 @@
  */
 
 import Link from 'next/link'
-import { notFound, useParams, useRouter } from 'next/navigation'
+import { notFound, useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpRight, BarChart3, ChevronRight, FileBox, FolderKanban, Inbox } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
@@ -56,16 +56,44 @@ const STATE_PILL: Record<MockFullDecision['state'], { bg: string; fg: string; do
   SUPERSEDED: { bg: 'bg-slate-100', fg: 'text-slate-500', dot: 'bg-slate-400' },
 }
 
+const VALID_TABS = new Set<ProjectHubTab>([
+  'overview',
+  'parts',
+  'decisions',
+  'feedback',
+  'pins',
+  'dashboards',
+  'activity',
+  'members',
+])
+
 export default function ProjectHubPage(): JSX.Element {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = params?.id ?? ''
   const project = getProject(id)
 
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [tab, setTab] = useState<ProjectHubTab>('overview')
+  const initialTab = ((): ProjectHubTab => {
+    const t = searchParams?.get('tab')
+    return t !== null && t !== undefined && VALID_TABS.has(t as ProjectHubTab)
+      ? (t as ProjectHubTab)
+      : 'overview'
+  })()
+  const [tab, setTab] = useState<ProjectHubTab>(initialTab)
+
+  // Re-honour ?tab=… when navigating between projects (or re-clicking a
+  // sidebar bookmark while already on the page).
+  useEffect(() => {
+    const t = searchParams?.get('tab')
+    if (t !== null && t !== undefined && VALID_TABS.has(t as ProjectHubTab)) {
+      setTab(t as ProjectHubTab)
+    }
+  }, [searchParams])
+
   const { bookmarks, toggle: toggleBookmark } = useBookmarks(id)
 
   useEffect(() => {

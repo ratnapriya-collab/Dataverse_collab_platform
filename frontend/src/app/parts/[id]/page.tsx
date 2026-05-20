@@ -525,6 +525,7 @@ export default function PartPage() {
           partId={part.id}
           partName={part.name}
           face={{ uuid: pendingFace.uuid, centroid: pendingFace.centroid }}
+          user={user}
           onClose={() => setPendingFace(null)}
           onCreated={handleDecisionCreated}
         />

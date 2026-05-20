@@ -12,7 +12,8 @@ import {
 } from 'react'
 import { AtSign, Sparkles, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
-import type { AnchorRead, Centroid, DecisionRead } from '@/types/api'
+import { buildMockAnchor, buildMockDecision, isMockPartId } from '@/lib/mockParts'
+import type { AnchorRead, Centroid, DecisionRead, UserRead } from '@/types/api'
 
 const MIN_RATIONALE = 10
 const MAX_RATIONALE = 4000
@@ -75,6 +76,8 @@ interface Props {
   partName: string
   /** The face the user clicked. The anchor is created lazily on submit. */
   face: { uuid: string; centroid: Centroid }
+  /** Current authenticated user — used as author for mock decisions. */
+  user: UserRead
   onClose: () => void
   /** Called with both the new (or upserted) anchor and the new decision. */
   onCreated: (anchor: AnchorRead, decision: DecisionRead) => void
@@ -84,6 +87,7 @@ export default function CreateDecisionModal({
   partId,
   partName,
   face,
+  user,
   onClose,
   onCreated,
 }: Props) {
@@ -218,6 +222,29 @@ export default function CreateDecisionModal({
     setError(null)
     setSubmitting(true)
     try {
+      // ── Mock-part fast path ────────────────────────────────────────
+      // demo_* parts aren't persisted in the backend, so anchor.create and
+      // decision.create would 404. Build synthetic responses that match the
+      // real API shapes and bubble them up via onCreated — parent will push
+      // them into React state. Refresh wipes them; that's the demo contract.
+      if (isMockPartId(partId)) {
+        const anchor = buildMockAnchor({
+          partId,
+          faceUuid: face.uuid,
+          centroid: face.centroid,
+          user,
+        })
+        const decision = buildMockDecision({
+          partId,
+          anchor,
+          rationale: rationale.trim(),
+          user,
+        })
+        onCreated(anchor, decision)
+        return
+      }
+
+      // ── Real backend path ──────────────────────────────────────────
       // Step 1: upsert the anchor for this face. Idempotent — same face on
       // a re-submit returns the existing anchor.
       const anchor = await api.anchors.create({

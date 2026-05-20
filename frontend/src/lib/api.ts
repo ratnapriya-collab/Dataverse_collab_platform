@@ -41,10 +41,14 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   body?: unknown
   auth?: boolean
+  /** Hard timeout in ms. Default 15000. A timed-out request throws ApiError(0, 'timeout'). */
+  timeoutMs?: number
 }
 
+const DEFAULT_TIMEOUT_MS = 15_000
+
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false } = opts
+  const { method = 'GET', body, auth = false, timeoutMs = DEFAULT_TIMEOUT_MS } = opts
   const headers: Record<string, string> = {}
 
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -56,17 +60,26 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     headers['Authorization'] = `Bearer ${token}`
   }
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
   let response: Response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
     })
   } catch (cause) {
+    clearTimeout(timer)
+    if (cause instanceof Error && cause.name === 'AbortError') {
+      throw new ApiError(0, 'timeout', `Request timed out after ${timeoutMs}ms`)
+    }
     const message = cause instanceof Error ? cause.message : 'network error'
     throw new ApiError(0, 'network_error', message)
   }
+  clearTimeout(timer)
 
   if (response.status === 204) return undefined as T
 

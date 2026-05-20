@@ -183,6 +183,8 @@ export default function PartPage() {
   const [part, setPart] = useState<PartDetail | null>(null)
   const [decisions, setDecisions] = useState<DecisionRead[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [slowWarning, setSlowWarning] = useState(false)
 
   // Face-pick & modal flow.
   //
@@ -198,62 +200,81 @@ export default function PartPage() {
   useEffect(() => {
     if (!partId) return
     let cancelled = false
+    setError(null)
+    setSlowWarning(false)
+    const slowTimer = setTimeout(() => {
+      if (!cancelled) setSlowWarning(true)
+    }, 6_000)
 
-    // ── Mock-ID fast path ────────────────────────────────────────────
-    // The Workspace → Project Hub flow surfaces part cards whose ids look
-    // like `demo_1`, `demo_2` (derived from SEED_FULL_DECISIONS). Those
-    // ids don't exist in the real backend, so a normal fetch would 404.
-    // For any id matching that mock shape we skip the API entirely and
-    // build a self-contained PartDetail + decisions list from seed data,
-    // so the same viewer renders with sample geometry.
+    function handleAuthFailure(err: unknown): boolean {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken()
+        router.replace('/login')
+        return true
+      }
+      return false
+    }
+
+    function commonErrorMessage(err: unknown, fallback: string): string {
+      if (err instanceof ApiError) {
+        if (err.code === 'timeout') return 'Request timed out — backend may be slow or offline.'
+        if (err.code === 'network_error') return 'Network error — is the backend running on :4000?'
+        if (err.status === 404) return 'Part not found, or you do not have access to it.'
+        return err.message
+      }
+      return err instanceof Error ? err.message : fallback
+    }
+
+    // User loads independently so the layout can render as soon as auth resolves.
+    api.auth
+      .me()
+      .then((u) => {
+        if (!cancelled) setUser(u)
+      })
+      .catch((err: unknown) => {
+        if (cancelled || handleAuthFailure(err)) return
+        setError(commonErrorMessage(err, 'Failed to load your profile'))
+      })
+
     if (isMockPartId(partId)) {
-      api.auth
-        .me()
-        .then((u) => {
-          if (cancelled) return
-          setUser(u)
-          setPart(buildMockPart(partId))
-          setDecisions(buildMockDecisions(partId))
-        })
-        .catch((err: unknown) => {
-          if (cancelled) return
-          if (err instanceof ApiError && err.status === 401) {
-            clearToken()
-            router.replace('/login')
-            return
-          }
-          setError(err instanceof Error ? err.message : 'Failed to load')
-        })
+      // Mock fast path — no network calls needed for part/decisions.
+      if (!cancelled) {
+        setPart(buildMockPart(partId))
+        setDecisions(buildMockDecisions(partId))
+      }
       return () => {
         cancelled = true
+        clearTimeout(slowTimer)
       }
     }
 
-    // ── Real-backend fetch (unchanged) ──────────────────────────────
-    Promise.all([api.auth.me(), api.parts.get(partId), api.decisions.list(partId)])
-      .then(([u, p, d]) => {
-        if (cancelled) return
-        setUser(u)
-        setPart(p)
-        setDecisions(d)
+    api.parts
+      .get(partId)
+      .then((p) => {
+        if (!cancelled) setPart(p)
       })
       .catch((err: unknown) => {
-        if (cancelled) return
-        if (err instanceof ApiError && err.status === 401) {
-          clearToken()
-          router.replace('/login')
-          return
-        }
-        if (err instanceof ApiError && err.status === 404) {
-          setError('Part not found, or you do not have access to it.')
-          return
-        }
-        setError(err instanceof Error ? err.message : 'Failed to load part')
+        if (cancelled || handleAuthFailure(err)) return
+        setError(commonErrorMessage(err, 'Failed to load part'))
       })
+
+    api.decisions
+      .list(partId)
+      .then((d) => {
+        if (!cancelled) setDecisions(d)
+      })
+      .catch((err: unknown) => {
+        if (cancelled || handleAuthFailure(err)) return
+        // Decisions failure is non-fatal — the viewer still works without pins.
+        // eslint-disable-next-line no-console
+        console.warn('Failed to load decisions', err)
+      })
+
     return () => {
       cancelled = true
+      clearTimeout(slowTimer)
     }
-  }, [partId, router])
+  }, [partId, router, loadAttempt])
 
   // On face pick: stash the face data and open the modal. No API call yet.
   const handleFacePick = useCallback((face: ViewerFace) => {
@@ -350,25 +371,51 @@ export default function PartPage() {
   if (error !== null) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center">
-          <p role="alert" className="text-sm text-red-600">
+        <div className="max-w-md text-center">
+          <p role="alert" className="text-sm font-semibold text-red-600">
             {error}
           </p>
-          <Link
-            href="/home"
-            className="mt-3 inline-block text-xs text-primary hover:underline"
-          >
-            ← Back to your parts
-          </Link>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null)
+                setLoadAttempt((n) => n + 1)
+              }}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700"
+            >
+              Retry
+            </button>
+            <Link
+              href="/home"
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300"
+            >
+              ← Back to your parts
+            </Link>
+          </div>
         </div>
       </main>
     )
   }
 
   if (user === null || part === null) {
+    const stage = user === null ? 'Authenticating…' : 'Loading part…'
     return (
-      <main className="flex min-h-screen items-center justify-center text-slate-500">
-        <span className="text-sm">Loading…</span>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 text-slate-500">
+        <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-primary" aria-hidden="true" />
+        <span className="text-sm">{stage}</span>
+        {slowWarning && (
+          <div className="mt-2 max-w-md text-center text-[11.5px] leading-relaxed text-slate-500">
+            Taking longer than expected. Check that the backend is running on <code className="font-mono text-slate-700">localhost:4000</code> — requests will time out automatically after 15s.
+            <button
+              type="button"
+              onClick={() => setLoadAttempt((n) => n + 1)}
+              className="ml-2 rounded border border-slate-300 bg-white px-2 py-0.5 font-semibold text-slate-700 transition hover:border-primary/40 hover:text-primary"
+            >
+              Retry now
+            </button>
+          </div>
+        )}
       </main>
     )
   }

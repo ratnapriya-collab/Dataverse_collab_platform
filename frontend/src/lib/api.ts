@@ -13,6 +13,8 @@ import type {
   PartDetail,
   PartRead,
   RationaleSuggestion,
+  SummarizeThreadRequest,
+  SummarizeThreadResponse,
   TokenResponse,
   UserRead,
 } from '@/types/api'
@@ -207,6 +209,13 @@ export const api = {
       return request<RationaleSuggestion>('/api/datum/suggest-rationale', {
         method: 'POST',
         body: { part_name: partName, anchor_id: anchorId },
+        auth: true,
+      })
+    },
+    summarizeThread(body: SummarizeThreadRequest): Promise<SummarizeThreadResponse> {
+      return request<SummarizeThreadResponse>('/api/datum/summarize-thread', {
+        method: 'POST',
+        body,
         auth: true,
       })
     },

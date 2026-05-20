@@ -19,19 +19,25 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   ArrowUpRight,
   Box,
   Check,
+  CheckCircle2,
   ClipboardList,
   History,
   Inbox,
+  Loader2,
   MessageSquare,
   Plus,
+  Quote,
   RotateCcw,
   Send,
   Sparkles,
   Workflow,
 } from 'lucide-react'
+import { ApiError, api } from '@/lib/api'
+import type { SummarizeThreadResponse } from '@/types/api'
 import DecisionsPanel from '@/components/decisions/DecisionsPanel'
 import RedactedDecisionCard from '@/components/redaction/RedactedDecisionCard'
 import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplainer'
@@ -223,7 +229,13 @@ export default function PartConversationHub({
         )}
         {tab === 'issues' && <IssuesTabBody partId={partId} rows={issueRows} />}
         {tab === 'activity' && <ActivityTabBody rows={activityRows} />}
-        {tab === 'threads' && <ThreadsTabBody decisions={visibleForComments} />}
+        {tab === 'threads' && (
+          <ThreadsTabBody
+            decisions={visibleForComments}
+            partId={partId}
+            partName={partName}
+          />
+        )}
       </div>
     </aside>
   )
@@ -430,9 +442,38 @@ function ActivityTabBody({
 
 function ThreadsTabBody({
   decisions,
+  partId,
+  partName,
 }: {
   decisions: DecisionRead[]
+  partId: string
+  partName: string
 }): JSX.Element {
+  const [summary, setSummary] = useState<SummarizeThreadResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSummarize(): Promise<void> {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await api.datum.summarizeThread({
+        thread_id: `thread:${partId}`,
+        part_name: partName,
+        decision_ids: decisions.slice(0, 5).map((d) => d.id),
+      })
+      setSummary(result)
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'timeout') {
+        setError('Datum timed out — please try again.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Datum is unavailable')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (decisions.length === 0) {
     return (
       <EmptyTab
@@ -442,36 +483,204 @@ function ThreadsTabBody({
       />
     )
   }
-  // Render each decision as a thread root. Replies are not in our schema yet
-  // — surface a single "Reply" affordance per thread so the pattern is clear.
+
   return (
-    <ul className="space-y-2">
-      {decisions.map((d) => (
-        <li key={d.id} className="overflow-hidden rounded-md border border-slate-200 bg-white">
-          <div className="flex items-start gap-2 px-2 py-1.5">
-            <Avatar name={d.author?.name ?? 'You'} size="sm" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-1.5">
-                <p className="truncate text-[11px] font-semibold text-slate-900">
-                  {d.author?.name ?? 'You'}
+    <div className="space-y-2">
+      <DatumSummarizeBar
+        loading={loading}
+        hasSummary={summary !== null}
+        onClick={handleSummarize}
+        onClear={() => setSummary(null)}
+      />
+      {error !== null && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[10.5px] text-rose-700"
+        >
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {summary !== null && <DatumSummaryCard summary={summary} decisions={decisions} />}
+      <ul className="space-y-2">
+        {decisions.map((d) => (
+          <li key={d.id} className="overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div className="flex items-start gap-2 px-2 py-1.5">
+              <Avatar name={d.author?.name ?? 'You'} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5">
+                  <p className="truncate text-[11px] font-semibold text-slate-900">
+                    {d.author?.name ?? 'You'}
+                  </p>
+                  <span className="text-[9px] text-slate-400">{formatTimeAgo(d.created_at)}</span>
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-700">
+                  {d.rationale}
                 </p>
-                <span className="text-[9px] text-slate-400">{formatTimeAgo(d.created_at)}</span>
               </div>
-              <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-700">
-                {d.rationale}
-              </p>
             </div>
-          </div>
+            <button
+              type="button"
+              className="flex w-full items-center gap-1 border-t border-slate-100 bg-slate-50/60 px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-primary"
+            >
+              <Plus className="h-2.5 w-2.5" />
+              Reply
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ── Datum · Hook 2 · Summarize Thread UI ────────────────────────────────────
+
+function DatumSummarizeBar({
+  loading,
+  hasSummary,
+  onClick,
+  onClear,
+}: {
+  loading: boolean
+  hasSummary: boolean
+  onClick: () => void
+  onClear: () => void
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-violet-50 px-2 py-1.5">
+      <Sparkles className="h-3 w-3 shrink-0 text-violet-600" />
+      <span className="text-[10.5px] font-semibold text-violet-900">
+        Datum can summarise this thread
+      </span>
+      <div className="ml-auto flex items-center gap-1">
+        {hasSummary && !loading && (
           <button
             type="button"
-            className="flex w-full items-center gap-1 border-t border-slate-100 bg-slate-50/60 px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-primary"
+            onClick={onClear}
+            className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9.5px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
           >
-            <Plus className="h-2.5 w-2.5" />
-            Reply
+            Clear
           </button>
-        </li>
-      ))}
-    </ul>
+        )}
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={loading}
+          className="inline-flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              Reading…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-2.5 w-2.5" />
+              {hasSummary ? 'Re-summarise' : 'Summarise'}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DatumSummaryCard({
+  summary,
+  decisions,
+}: {
+  summary: SummarizeThreadResponse
+  decisions: DecisionRead[]
+}): JSX.Element {
+  if (summary.declined) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10.5px] text-amber-800">
+        <p className="font-semibold">Datum declined to summarise.</p>
+        <p className="mt-0.5 text-[10px]">
+          {summary.declined_reason ?? 'Insufficient evidence to draft a confident summary.'}
+        </p>
+      </div>
+    )
+  }
+
+  const confidencePct = Math.round(summary.confidence * 100)
+  const confidenceTone =
+    summary.confidence >= 0.8
+      ? 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+      : summary.confidence >= 0.6
+        ? 'bg-amber-100 text-amber-700 ring-amber-200'
+        : 'bg-rose-100 text-rose-700 ring-rose-200'
+
+  const decisionIds = new Set(decisions.map((d) => d.id))
+
+  return (
+    <article className="dv-anim-fade-up overflow-hidden rounded-lg border border-violet-200 bg-white shadow-sm">
+      <header className="flex items-center gap-1.5 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-white px-3 py-1.5">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-sm">
+          <Sparkles className="h-3 w-3" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold text-violet-900">Datum</p>
+          <p className="text-[9px] uppercase tracking-wider text-violet-500">Thread summary</p>
+        </div>
+        <span
+          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums ring-1 ${confidenceTone}`}
+          title="Confidence score from Datum"
+        >
+          {confidencePct}%
+        </span>
+      </header>
+      <div className="space-y-2 px-3 py-2 text-[11px]">
+        <p className="leading-relaxed text-slate-800">{summary.summary}</p>
+        {summary.key_concerns.length > 0 && (
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+              Key concerns
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {summary.key_concerns.map((k) => (
+                <li key={k} className="flex items-start gap-1.5 leading-snug text-slate-700">
+                  <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0 text-amber-500" />
+                  <span>{k}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="rounded-md border border-emerald-100 bg-emerald-50/70 px-2 py-1.5">
+          <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            Recommended action
+          </p>
+          <p className="mt-0.5 leading-snug text-emerald-900">{summary.recommended_action}</p>
+        </div>
+        {summary.citations.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 border-t border-slate-100 pt-1.5">
+            <Quote className="h-2.5 w-2.5 text-slate-400" />
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+              Citations
+            </span>
+            {summary.citations.map((c) => (
+              <span
+                key={c}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${
+                  decisionIds.has(c)
+                    ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="border-t border-slate-100 pt-1.5 text-[9px] text-slate-400">
+          Datum drafted this summary —{' '}
+          <span className="font-semibold text-slate-500">human always has the final word</span>.
+          Source: <span className="font-mono">{summary.source}</span>
+        </p>
+      </div>
+    </article>
   )
 }
 

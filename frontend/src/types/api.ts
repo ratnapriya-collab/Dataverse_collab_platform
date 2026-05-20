@@ -118,3 +118,23 @@ export interface DecisionCreate {
 export interface RationaleSuggestion {
   suggestion: string
 }
+
+// ── Datum AI · Hook 2 · Summarize Thread ─────────────────────────────────
+// Contracts match backend Pydantic schemas (app/schemas/decision.py).
+
+export interface SummarizeThreadRequest {
+  thread_id: string
+  part_name?: string
+  decision_ids?: string[]
+}
+
+export interface SummarizeThreadResponse {
+  summary: string
+  key_concerns: string[]
+  recommended_action: string
+  confidence: number
+  citations: string[]
+  source: 'llm' | 'mocked-fallback'
+  declined: boolean
+  declined_reason?: string | null
+}

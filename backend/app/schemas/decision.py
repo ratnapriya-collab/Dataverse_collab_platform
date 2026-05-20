@@ -90,3 +90,30 @@ class RationaleSuggestion(BaseModel):
 class RationaleSuggestRequest(BaseModel):
     part_name: str | None = None
     anchor_id: str | None = None
+
+
+# ── Hook 2: Summarize Thread ────────────────────────────────────────────────
+# Pydantic contract matches the Datum AI module architecture spec (§6).
+# Phase 1 mocked: the handler returns a canned response that still respects
+# the schema. Phase 2 swap is handler internals only — schema is frozen.
+
+
+class SummarizeThreadRequest(BaseModel):
+    """Request to summarize a comment thread on a decision/part."""
+
+    thread_id: str = Field(min_length=1)
+    part_name: str | None = None
+    decision_ids: list[str] = Field(default_factory=list)
+
+
+class SummarizeThreadResponse(BaseModel):
+    """Datum's executive summary of a thread."""
+
+    summary: str = Field(min_length=20, max_length=800)
+    key_concerns: list[str]
+    recommended_action: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    citations: list[str] = Field(default_factory=list)
+    source: str = "mocked-fallback"
+    declined: bool = False
+    declined_reason: str | None = None

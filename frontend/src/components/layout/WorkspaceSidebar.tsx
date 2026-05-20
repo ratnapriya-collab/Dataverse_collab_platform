@@ -23,12 +23,13 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  Cloud,
   Crown,
   FileCheck2,
   History,
   Layers,
+  LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   MoreHorizontal,
   Pin,
@@ -51,7 +52,6 @@ export type SidebarSection =
   | 'audit'
   | 'admin'
   | 'pins'
-  | 'storage'
 
 interface NavItem {
   id: SidebarSection
@@ -125,7 +125,20 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
     { id: 'decisions', label: 'Shared with Me', icon: UserCheck, href: '/decisions' },
     { id: 'audit', label: 'My Analytics', icon: BarChart3, href: '/audit' },
     { id: 'pins', label: 'My Pins', icon: Pin, href: '/workspace' },
-    { id: 'storage', label: 'My Cloud Storage', icon: Cloud, href: '/workspace' },
+  ]
+
+  const createItems: Array<{
+    label: string
+    icon: LucideIcon
+    href: string
+    hasSubmenu: boolean
+  }> = [
+    { label: 'Task', icon: ClipboardCheck, href: '/my-work', hasSubmenu: false },
+    { label: 'Project', icon: Layers, href: '/workspace', hasSubmenu: true },
+    { label: 'Workspace', icon: Layers, href: '/workspace', hasSubmenu: true },
+    { label: 'Discussion', icon: Megaphone, href: '/workspace', hasSubmenu: true },
+    { label: 'Overview', icon: Activity, href: '/workspace', hasSubmenu: true },
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/workspace', hasSubmenu: true },
   ]
 
   const workspaceProjects = SEED_PROJECTS.slice(0, 4)
@@ -179,42 +192,50 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
             <div
               role="menu"
               className={[
-                'dv-anim-pop absolute z-50 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl',
-                collapsed ? 'left-full top-0 ml-1.5 w-44' : 'left-0 right-0 mt-1.5',
+                'dv-anim-pop absolute z-50 overflow-hidden rounded-lg border border-slate-200 bg-white py-1.5 shadow-xl',
+                collapsed ? 'left-full top-0 ml-1.5 w-48' : 'left-0 right-0 mt-1.5',
               ].join(' ')}
             >
-              {[
-                { label: 'Project', href: '/workspace' },
-                { label: 'Part', href: '/workspace' },
-                { label: 'Decision', href: '/decisions' },
-                { label: 'Issue', href: '/decisions' },
-                { label: 'Comment', href: '/workspace' },
-              ].map((c) => (
-                <Link
-                  key={c.label}
-                  href={c.href}
-                  role="menuitem"
-                  onClick={() => setCreateOpen(false)}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50"
-                >
-                  <span>{c.label}</span>
-                  <ChevronRight className="h-3 w-3 text-slate-300" />
-                </Link>
-              ))}
+              {createItems.map((c) => {
+                const CIcon = c.icon
+                return (
+                  <Link
+                    key={c.label}
+                    href={c.href}
+                    role="menuitem"
+                    onClick={() => setCreateOpen(false)}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-[12.5px] text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <CIcon className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="font-medium">{c.label}</span>
+                    </span>
+                    {c.hasSubmenu && <ChevronRight className="h-3 w-3 text-slate-400" />}
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
 
+        {/* Search bar — looks like an input, opens command palette */}
         <button
           type="button"
           aria-label="Search"
           className={[
-            'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-slate-600 transition hover:bg-slate-100 hover:text-slate-900',
+            'flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 transition hover:border-slate-300 hover:bg-white hover:text-slate-900',
             collapsed ? 'justify-center' : '',
           ].join(' ')}
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          {!collapsed && <span className="truncate text-slate-500">Search · ⌘K</span>}
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[9px] font-semibold text-slate-500 shadow-sm">
+                ⌘K
+              </kbd>
+            </>
+          )}
         </button>
       </div>
 

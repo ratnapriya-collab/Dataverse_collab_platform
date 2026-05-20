@@ -82,9 +82,19 @@ class DecisionRead(BaseModel):
 
 
 class RationaleSuggestion(BaseModel):
-    """Mocked Datum response. Templates with optional placeholders filled in."""
+    """Datum AI · Hook 1 · Draft Rationale response (matches spec §6).
+
+    `suggestion` is kept for backward-compat with the original Day 6 client.
+    All other fields are required by the spec — Phase 1 fills them with
+    mocked-but-grounded values so the contract is frozen for the Ollama swap.
+    """
 
     suggestion: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.82)
+    citations: list[str] = Field(default_factory=list)
+    source: str = "mocked-fallback"
+    declined: bool = False
+    declined_reason: str | None = None
 
 
 class RationaleSuggestRequest(BaseModel):

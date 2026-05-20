@@ -87,6 +87,16 @@ def suggest_rationale(
     started = time.perf_counter()
     template = random.choice(_TEMPLATES)
     suggestion = template.format(part_name=body.part_name or "this part")
+    # Citations: the mock templates each cite a real standard string from
+    # SEED_FULL_DECISIONS so the UI's citation chips have something to render.
+    citations = ["AS9100 §6.4.3"] if "AS9100" in template or "thickness" in template else []
+    response = RationaleSuggestion(
+        suggestion=suggestion,
+        confidence=0.82,
+        citations=citations,
+        source="mocked-fallback",
+        declined=False,
+    )
     latency_ms = int((time.perf_counter() - started) * 1000)
     _audit_datum_call(
         session,
@@ -94,13 +104,13 @@ def suggest_rationale(
         actor_id=current.id,
         subject_id=body.anchor_id,
         request_payload=body.model_dump(),
-        response_payload={"suggestion": suggestion},
-        confidence=0.82,
+        response_payload=response.model_dump(),
+        confidence=response.confidence,
         latency_ms=latency_ms,
-        source="mocked-fallback",
-        declined=False,
+        source=response.source,
+        declined=response.declined,
     )
-    return RationaleSuggestion(suggestion=suggestion)
+    return response
 
 
 # ── Hook 2: Summarize Thread ────────────────────────────────────────────────

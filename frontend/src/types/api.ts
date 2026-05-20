@@ -117,6 +117,11 @@ export interface DecisionCreate {
 
 export interface RationaleSuggestion {
   suggestion: string
+  confidence: number
+  citations: string[]
+  source: 'llm' | 'mocked-fallback'
+  declined: boolean
+  declined_reason?: string | null
 }
 
 // ── Datum AI · Hook 2 · Summarize Thread ─────────────────────────────────

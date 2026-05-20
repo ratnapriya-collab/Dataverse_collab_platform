@@ -91,6 +91,13 @@ export default function CreateDecisionModal({
   const [submitting, setSubmitting] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [datumMeta, setDatumMeta] = useState<{
+    confidence: number
+    citations: string[]
+    source: string
+    declined: boolean
+    declined_reason?: string | null
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
@@ -179,8 +186,26 @@ export default function CreateDecisionModal({
     setError(null)
     setSuggesting(true)
     try {
-      const { suggestion } = await api.datum.suggestRationale(partName)
-      setRationale(suggestion)
+      const result = await api.datum.suggestRationale(partName)
+      if (result.declined) {
+        setDatumMeta({
+          confidence: result.confidence,
+          citations: result.citations,
+          source: result.source,
+          declined: true,
+          declined_reason: result.declined_reason,
+        })
+        // Cite-or-decline: don't overwrite the textarea when Datum declined.
+        return
+      }
+      setRationale(result.suggestion)
+      setDatumMeta({
+        confidence: result.confidence,
+        citations: result.citations,
+        source: result.source,
+        declined: false,
+        declined_reason: null,
+      })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to fetch suggestion')
     } finally {
@@ -388,15 +413,33 @@ export default function CreateDecisionModal({
           )}
 
           <div className="mt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleSuggest}
-              disabled={suggesting || submitting}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-brand hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {suggesting ? 'Suggesting…' : 'Suggest rationale (Datum)'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSuggest}
+                disabled={suggesting || submitting}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-brand hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {suggesting ? 'Suggesting…' : 'Suggest rationale (Datum)'}
+              </button>
+              {datumMeta !== null && !datumMeta.declined && (
+                <span
+                  title={`Datum drafted this · source: ${datumMeta.source}`}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ring-1',
+                    datumMeta.confidence >= 0.8
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : datumMeta.confidence >= 0.6
+                        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                        : 'bg-rose-50 text-rose-700 ring-rose-200',
+                  ].join(' ')}
+                >
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {Math.round(datumMeta.confidence * 100)}%
+                </span>
+              )}
+            </div>
             <span
               className={[
                 'text-xs',
@@ -406,6 +449,32 @@ export default function CreateDecisionModal({
               {trimmedLen} / {MIN_RATIONALE} min
             </span>
           </div>
+
+          {datumMeta !== null && datumMeta.declined && (
+            <div
+              role="status"
+              className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+            >
+              <p className="font-semibold">Datum declined to suggest.</p>
+              <p className="mt-0.5 text-[11px]">
+                {datumMeta.declined_reason ?? 'Confidence below threshold — write the rationale yourself.'}
+              </p>
+            </div>
+          )}
+
+          {datumMeta !== null && !datumMeta.declined && datumMeta.citations.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px]">
+              <span className="font-bold uppercase tracking-wider text-slate-500">Cites</span>
+              {datumMeta.citations.map((c) => (
+                <span
+                  key={c}
+                  className="rounded bg-violet-50 px-1.5 py-0.5 font-mono text-violet-700 ring-1 ring-violet-200"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
 
           {error !== null && (
             <p

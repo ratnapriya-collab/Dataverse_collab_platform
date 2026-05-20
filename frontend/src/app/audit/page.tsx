@@ -55,6 +55,7 @@ type AuditEventKind =
   | 'RESOLVER_COMPLETED'
   | 'PLM_PUSHED'
   | 'DECISION_SUPERSEDED'
+  | 'DATUM_CALLED'
 
 interface AuditRow {
   id: string
@@ -172,6 +173,12 @@ const KIND_STYLE: Record<
     bg: 'bg-amber-50',
     fg: 'text-amber-600',
     label: 'Decision superseded',
+  },
+  DATUM_CALLED: {
+    icon: Sparkles,
+    bg: 'bg-violet-50',
+    fg: 'text-violet-700',
+    label: 'Datum called',
   },
 }
 
@@ -660,4 +667,5 @@ const DOT_BG: Record<AuditEventKind, string> = {
   RESOLVER_COMPLETED: 'bg-slate-600',
   PLM_PUSHED: 'bg-amber-600',
   DECISION_SUPERSEDED: 'bg-amber-500',
+  DATUM_CALLED: 'bg-violet-500',
 }

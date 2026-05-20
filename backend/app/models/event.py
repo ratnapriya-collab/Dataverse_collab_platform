@@ -26,6 +26,10 @@ class EventType(str, Enum):
     DECISION_ACCEPTED = "DECISION_ACCEPTED"
     DECISION_REJECTED = "DECISION_REJECTED"
     DECISION_SUPERSEDED = "DECISION_SUPERSEDED"
+    # Datum AI (M8). Rule #6: every Datum invocation MUST be audited.
+    # Payload carries { hook, input, output, confidence, latency_ms, source }
+    # so reviewers can trace every AI suggestion that ever influenced a decision.
+    DATUM_CALLED = "DATUM_CALLED"
 
 
 class Event(SQLModel, table=True):

@@ -13,9 +13,13 @@ Hooks shipped in this file:
 from __future__ import annotations
 
 import random
+import time
 
 from fastapi import APIRouter, Depends
+from sqlmodel import Session
 
+from app.database import get_session
+from app.models.event import EventType
 from app.models.user import User
 from app.schemas.decision import (
     RationaleSuggestion,
@@ -24,8 +28,46 @@ from app.schemas.decision import (
     SummarizeThreadResponse,
 )
 from app.utils.auth import get_current_user
+from app.utils.events import log_event
 
 router = APIRouter()
+
+
+def _audit_datum_call(
+    session: Session,
+    *,
+    hook: str,
+    actor_id: str,
+    subject_id: str | None,
+    request_payload: dict,
+    response_payload: dict,
+    confidence: float,
+    latency_ms: int,
+    source: str,
+    declined: bool,
+) -> None:
+    """Rule #6 of the Datum AI spec: every Datum call writes a DATUM_CALLED event.
+
+    Payload follows the architecture doc exactly:
+      { hook, input, output, confidence, latency_ms, source, declined }.
+    Caller still owns the commit so the audit row is durable.
+    """
+    log_event(
+        session,
+        event_type=EventType.DATUM_CALLED,
+        actor_id=actor_id,
+        subject_id=subject_id,
+        payload={
+            "hook": hook,
+            "input": request_payload,
+            "output": response_payload,
+            "confidence": confidence,
+            "latency_ms": latency_ms,
+            "source": source,
+            "declined": declined,
+        },
+    )
+    session.commit()
 
 
 _TEMPLATES = [
@@ -38,11 +80,26 @@ _TEMPLATES = [
 @router.post("/suggest-rationale", response_model=RationaleSuggestion)
 def suggest_rationale(
     body: RationaleSuggestRequest,
-    _current: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ) -> RationaleSuggestion:
     """Hook 1 · Draft Rationale (mocked). Always auth-gated."""
+    started = time.perf_counter()
     template = random.choice(_TEMPLATES)
     suggestion = template.format(part_name=body.part_name or "this part")
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    _audit_datum_call(
+        session,
+        hook="suggest-rationale",
+        actor_id=current.id,
+        subject_id=body.anchor_id,
+        request_payload=body.model_dump(),
+        response_payload={"suggestion": suggestion},
+        confidence=0.82,
+        latency_ms=latency_ms,
+        source="mocked-fallback",
+        declined=False,
+    )
     return RationaleSuggestion(suggestion=suggestion)
 
 
@@ -95,7 +152,8 @@ _SUMMARY_TEMPLATES = [
 @router.post("/summarize-thread", response_model=SummarizeThreadResponse)
 def summarize_thread(
     body: SummarizeThreadRequest,
-    _current: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ) -> SummarizeThreadResponse:
     """Hook 2 · Summarize Thread (mocked).
 
@@ -103,12 +161,11 @@ def summarize_thread(
     reference the actual decision IDs passed in the request, so the response
     feels grounded even though the LLM call is stubbed.
     """
+    started = time.perf_counter()
     template = random.choice(_SUMMARY_TEMPLATES)
     part_name = body.part_name or "this part"
-    # Citations: prefer the real decision IDs the client passed in; fall back
-    # to a stable string so the schema is always populated.
     citations = body.decision_ids[:3] if body.decision_ids else ["AS9100 §6.4.3"]
-    return SummarizeThreadResponse(
+    response = SummarizeThreadResponse(
         summary=template["summary"].format(part_name=part_name),
         key_concerns=template["key_concerns"],
         recommended_action=template["recommended_action"],
@@ -117,3 +174,17 @@ def summarize_thread(
         source="mocked-fallback",
         declined=False,
     )
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    _audit_datum_call(
+        session,
+        hook="summarize-thread",
+        actor_id=current.id,
+        subject_id=body.thread_id,
+        request_payload=body.model_dump(),
+        response_payload=response.model_dump(),
+        confidence=response.confidence,
+        latency_ms=latency_ms,
+        source=response.source,
+        declined=response.declined,
+    )
+    return response

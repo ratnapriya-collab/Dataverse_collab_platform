@@ -37,6 +37,7 @@ import StatCard from '@/components/workspace/StatCard'
 import Toast, { type ToastState } from '@/components/ui/Toast'
 import ConfidencePill from '@/components/resolver/ConfidencePill'
 import VerifyAnchorModal from '@/components/resolver/VerifyAnchorModal'
+import DatumRegressionPanel from '@/components/datum/DatumRegressionPanel'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_RESOLVER_RESULT, type MockResolverBucket } from '@/lib/mockWorkspace'
@@ -346,6 +347,14 @@ export default function WhatChangedPage(): JSX.Element {
               </button>
             </div>
           )}
+
+          {/* ── Datum · Hook 4 · Flag Regressions ────────────────────────── */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '200ms' }}>
+            <DatumRegressionPanel
+              partId={partId}
+              revSnapshotId={`${partId}:${result.to_rev}`}
+            />
+          </div>
 
           {/* ── Buckets ────────────────────────────────────────────────── */}
           <div className="mt-8 space-y-4">

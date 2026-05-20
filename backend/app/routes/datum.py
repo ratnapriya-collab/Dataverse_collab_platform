@@ -22,6 +22,9 @@ from app.database import get_session
 from app.models.event import EventType
 from app.models.user import User
 from app.schemas.decision import (
+    FlaggedRegression,
+    FlagRegressionsRequest,
+    FlagRegressionsResponse,
     RationaleSuggestion,
     RationaleSuggestRequest,
     SummarizeThreadRequest,
@@ -196,5 +199,80 @@ def summarize_thread(
         latency_ms=latency_ms,
         source=response.source,
         declined=response.declined,
+    )
+    return response
+
+
+# ── Hook 4: Flag Regressions ────────────────────────────────────────────────
+
+
+# Canned flag set — each entry references the resolver buckets surfaced in
+# SEED_RESOLVER_RESULT.regressed so the demo lines up. Real Phase 2 will
+# generate these via Ollama after the resolver runs.
+_REGRESSION_TEMPLATES = [
+    {
+        "decision_id": "DEC-BRACKET-09",
+        "likelihood": 0.91,
+        "reasoning": (
+            "Bolt hole pattern offset 0.3 mm vs. drawing in Rev B — the same anchor "
+            "Sarah flagged on Rev A. Tolerance stack against the mating boss is "
+            "unresolved and the new geometry widens the offset by ~0.05 mm."
+        ),
+        "suggested_action": "urgent_review",
+    },
+    {
+        "decision_id": "DEC-BRACKET-12",
+        "likelihood": 0.74,
+        "reasoning": (
+            "Fillet radius at the inner web reduced from 2.5 mm to 1.8 mm. Prior "
+            "decision recommended ≥ 2.0 mm to clear stress concentration per "
+            "AS9100 §6.4.3."
+        ),
+        "suggested_action": "verify_anchor",
+    },
+    {
+        "decision_id": "DEC-BRACKET-15",
+        "likelihood": 0.63,
+        "reasoning": (
+            "Surface-finish callout dropped from the Rev B drawing. The original "
+            "decision tightened roughness to Ra 1.6 µm for gasket sealing."
+        ),
+        "suggested_action": "verify_anchor",
+    },
+]
+
+
+@router.post("/flag-regressions", response_model=FlagRegressionsResponse)
+def flag_regressions(
+    body: FlagRegressionsRequest,
+    current: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> FlagRegressionsResponse:
+    """Hook 4 · Flag Regressions (mocked).
+
+    Scans a fresh RevSnapshot and surfaces decisions Datum thinks likely
+    regressed. Phase 1 returns a fixed-but-grounded set; Phase 2 runs after
+    the cross-rev resolver completes and feeds Ollama with the diff.
+    """
+    started = time.perf_counter()
+    flagged = [FlaggedRegression(**t) for t in _REGRESSION_TEMPLATES]
+    runtime_ms = int((time.perf_counter() - started) * 1000)
+    response = FlagRegressionsResponse(
+        flagged=flagged,
+        scanned_count=len(flagged) + 9,  # also "scanned" 9 non-flagged decisions
+        runtime_ms=runtime_ms,
+        source="mocked-fallback",
+    )
+    _audit_datum_call(
+        session,
+        hook="flag-regressions",
+        actor_id=current.id,
+        subject_id=body.rev_snapshot_id,
+        request_payload=body.model_dump(),
+        response_payload=response.model_dump(),
+        confidence=max((f.likelihood for f in flagged), default=0.0),
+        latency_ms=runtime_ms,
+        source=response.source,
+        declined=False,
     )
     return response

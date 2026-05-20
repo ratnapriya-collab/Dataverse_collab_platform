@@ -127,3 +127,31 @@ class SummarizeThreadResponse(BaseModel):
     source: str = "mocked-fallback"
     declined: bool = False
     declined_reason: str | None = None
+
+
+# ── Hook 4: Flag Regressions ────────────────────────────────────────────────
+
+
+class FlagRegressionsRequest(BaseModel):
+    """Run Datum across a new revision and ask for flagged regressions."""
+
+    rev_snapshot_id: str = Field(min_length=1)
+    part_id: str | None = None
+
+
+class FlaggedRegression(BaseModel):
+    """A single decision Datum thinks likely regressed in the new revision."""
+
+    decision_id: str
+    likelihood: float = Field(ge=0.0, le=1.0)
+    reasoning: str
+    suggested_action: str  # "urgent_review" | "verify_anchor" | "no_action"
+
+
+class FlagRegressionsResponse(BaseModel):
+    """Result of a flag-regressions sweep."""
+
+    flagged: list[FlaggedRegression]
+    scanned_count: int
+    runtime_ms: int
+    source: str = "mocked-fallback"

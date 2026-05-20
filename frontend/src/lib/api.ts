@@ -12,6 +12,8 @@ import type {
   HealthResponse,
   PartDetail,
   PartRead,
+  FlagRegressionsRequest,
+  FlagRegressionsResponse,
   RationaleSuggestion,
   SummarizeThreadRequest,
   SummarizeThreadResponse,
@@ -214,6 +216,13 @@ export const api = {
     },
     summarizeThread(body: SummarizeThreadRequest): Promise<SummarizeThreadResponse> {
       return request<SummarizeThreadResponse>('/api/datum/summarize-thread', {
+        method: 'POST',
+        body,
+        auth: true,
+      })
+    },
+    flagRegressions(body: FlagRegressionsRequest): Promise<FlagRegressionsResponse> {
+      return request<FlagRegressionsResponse>('/api/datum/flag-regressions', {
         method: 'POST',
         body,
         auth: true,

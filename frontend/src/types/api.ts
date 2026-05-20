@@ -143,3 +143,26 @@ export interface SummarizeThreadResponse {
   declined: boolean
   declined_reason?: string | null
 }
+
+// ── Datum AI · Hook 4 · Flag Regressions ──────────────────────────────────
+
+export interface FlagRegressionsRequest {
+  rev_snapshot_id: string
+  part_id?: string
+}
+
+export type FlaggedSuggestedAction = 'urgent_review' | 'verify_anchor' | 'no_action'
+
+export interface FlaggedRegression {
+  decision_id: string
+  likelihood: number
+  reasoning: string
+  suggested_action: FlaggedSuggestedAction
+}
+
+export interface FlagRegressionsResponse {
+  flagged: FlaggedRegression[]
+  scanned_count: number
+  runtime_ms: number
+  source: 'llm' | 'mocked-fallback'
+}

@@ -26,6 +26,7 @@ import NotificationsBell from '@/components/layout/NotificationsBell'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import ProjectHubHero from '@/components/projects/ProjectHubHero'
 import ProjectHubTabs, { type ProjectHubTab } from '@/components/projects/ProjectHubTabs'
+import ProjectOverviewTab from '@/components/projects/ProjectOverviewTab'
 import FeedbackPanel from '@/components/feedback/FeedbackPanel'
 import Avatar from '@/components/workspace/Avatar'
 import TeamBadge from '@/components/workspace/TeamBadge'
@@ -62,7 +63,7 @@ export default function ProjectHubPage(): JSX.Element {
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [tab, setTab] = useState<ProjectHubTab>('parts')
+  const [tab, setTab] = useState<ProjectHubTab>('overview')
 
   useEffect(() => {
     let cancelled = false
@@ -154,6 +155,7 @@ export default function ProjectHubPage(): JSX.Element {
   }
 
   const counts: Record<ProjectHubTab, number> = {
+    overview: 0,
     parts: parts.length,
     decisions: decisions.length,
     feedback: decisions.length, // every decision is a feedback row
@@ -203,6 +205,9 @@ export default function ProjectHubPage(): JSX.Element {
 
           {/* Tab content */}
           <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '160ms' }} key={tab}>
+            {tab === 'overview' && (
+              <ProjectOverviewTab decisions={decisions} members={projectMembers} />
+            )}
             {tab === 'parts' && <PartsTab parts={parts} />}
             {tab === 'decisions' && <DecisionsTab decisions={decisions} />}
             {tab === 'feedback' && (

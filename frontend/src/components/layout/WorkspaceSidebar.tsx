@@ -128,6 +128,7 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
     { id: 'decisions', label: 'Shared with Me', icon: UserCheck, href: '/decisions' },
     { id: 'audit', label: 'My Analytics', icon: BarChart3, href: '/audit' },
     { id: 'pins', label: 'My Pins', icon: Pin, href: '/workspace' },
+    { id: 'admin', label: 'Admin', icon: Crown, href: '/admin' },
   ]
 
   const createItems: Array<{
@@ -321,19 +322,10 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
                   ].join(' ')}
                 >
                   <Link
-                    href="/admin"
-                    role="menuitem"
-                    onClick={() => setMoreOpen(false)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <Crown className="h-3.5 w-3.5 text-primary" />
-                    Admin
-                  </Link>
-                  <Link
                     href="/decisions"
                     role="menuitem"
                     onClick={() => setMoreOpen(false)}
-                    className="flex items-center gap-2 border-t border-slate-100 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50"
                   >
                     <FileCheck2 className="h-3.5 w-3.5 text-slate-500" />
                     All Decisions

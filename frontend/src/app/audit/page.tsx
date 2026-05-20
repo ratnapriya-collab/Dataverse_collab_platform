@@ -29,6 +29,7 @@ import {
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
+import AnalyticsCards from '@/components/audit/AnalyticsCards'
 import NotificationsBell from '@/components/layout/NotificationsBell'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import StatCard from '@/components/workspace/StatCard'
@@ -408,6 +409,11 @@ export default function AuditPage() {
               accent="text-brand-700"
               accentBg="bg-brand-50"
             />
+          </div>
+
+          {/* Analytics — 4 SVG chart cards */}
+          <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '120ms' }}>
+            <AnalyticsCards />
           </div>
 
           {/* Filters */}

@@ -39,9 +39,21 @@ import { formatTimeAgo, type MockFullDecision, type MockMember } from '@/lib/moc
 interface Props {
   decisions: MockFullDecision[]
   members: MockMember[]
+  bookmarks: string[]
+  onToggleBookmark: (id: string) => void
 }
 
-type CardId = 'overdue' | 'blocked' | 'in-progress' | 'open' | 'members' | 'by-status' | 'pins'
+export type CardId = 'overdue' | 'blocked' | 'in-progress' | 'open' | 'members' | 'by-status' | 'pins'
+
+export const CARD_TITLES: Record<CardId, string> = {
+  overdue: 'Overdue Decisions',
+  blocked: 'Blocked',
+  'in-progress': 'In Progress',
+  open: 'Open Decisions',
+  members: 'Member Tasks Summary',
+  'by-status': 'Decisions By Status',
+  pins: 'Pins',
+}
 
 type CountKey = 'DRAFT' | 'PROPOSED' | 'ACCEPTED' | 'REJECTED'
 
@@ -60,7 +72,12 @@ const ACCENT: Record<'rose' | 'amber' | 'emerald', { ring: string; text: string 
 
 const ONE_DAY_MS = 24 * 3_600_000
 
-export default function ProjectOverviewTab({ decisions, members }: Props): JSX.Element {
+export default function ProjectOverviewTab({
+  decisions,
+  members,
+  bookmarks,
+  onToggleBookmark,
+}: Props): JSX.Element {
   const [expandedId, setExpandedId] = useState<CardId | null>(null)
   const [menuId, setMenuId] = useState<CardId | null>(null)
 
@@ -110,6 +127,11 @@ export default function ProjectOverviewTab({ decisions, members }: Props): JSX.E
       onToggleExpand: () => setExpandedId((p) => (p === id ? null : id)),
       menuOpen: menuId === id,
       onToggleMenu: () => setMenuId((p) => (p === id ? null : id)),
+      bookmarked: bookmarks.includes(id),
+      onBookmark: () => {
+        onToggleBookmark(id)
+        setMenuId(null)
+      },
     }
   }
 
@@ -193,6 +215,8 @@ interface CardChromeProps {
   onToggleExpand: () => void
   menuOpen: boolean
   onToggleMenu: () => void
+  bookmarked: boolean
+  onBookmark: () => void
 }
 
 function CardShell({
@@ -202,6 +226,8 @@ function CardShell({
   onToggleExpand,
   menuOpen,
   onToggleMenu,
+  bookmarked,
+  onBookmark,
   children,
   className,
 }: CardChromeProps & {
@@ -240,7 +266,7 @@ function CardShell({
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
-            {menuOpen && <CardMenu />}
+            {menuOpen && <CardMenu bookmarked={bookmarked} onBookmark={onBookmark} />}
           </div>
           <button
             type="button"
@@ -257,11 +283,22 @@ function CardShell({
   )
 }
 
-function CardMenu(): JSX.Element {
-  const items: Array<{ icon: typeof Edit3; label: string }> = [
+function CardMenu({
+  bookmarked,
+  onBookmark,
+}: {
+  bookmarked: boolean
+  onBookmark: () => void
+}): JSX.Element {
+  const items: Array<{ icon: typeof Edit3; label: string; onClick?: () => void; active?: boolean }> = [
     { icon: Edit3, label: 'Edit' },
     { icon: Link2, label: 'Copy Link' },
-    { icon: Bookmark, label: 'Bookmark' },
+    {
+      icon: Bookmark,
+      label: bookmarked ? 'Remove bookmark' : 'Bookmark',
+      onClick: onBookmark,
+      active: bookmarked,
+    },
   ]
   return (
     <div
@@ -275,12 +312,19 @@ function CardMenu(): JSX.Element {
             key={it.label}
             type="button"
             role="menuitem"
+            onClick={it.onClick}
             className={[
-              'flex w-full items-center gap-2.5 px-3 py-2 text-[12px] text-slate-700 transition hover:bg-slate-50',
+              'flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition hover:bg-slate-50',
               idx > 0 ? 'border-t border-slate-100' : '',
+              it.active === true ? 'text-primary font-semibold' : 'text-slate-700',
             ].join(' ')}
           >
-            <Icon className="h-3.5 w-3.5 text-slate-500" />
+            <Icon
+              className={[
+                'h-3.5 w-3.5',
+                it.active === true ? 'fill-primary text-primary' : 'text-slate-500',
+              ].join(' ')}
+            />
             {it.label}
           </button>
         )

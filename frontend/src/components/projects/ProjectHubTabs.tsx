@@ -8,9 +8,26 @@
  * rest are subtle.
  */
 
-import { ClipboardList, FileBox, History, LayoutDashboard, MessageSquare, Users } from 'lucide-react'
+import {
+  Activity,
+  BarChart3,
+  ClipboardList,
+  FileBox,
+  LayoutDashboard,
+  MessageSquare,
+  Pin,
+  Users,
+} from 'lucide-react'
 
-export type ProjectHubTab = 'overview' | 'parts' | 'decisions' | 'feedback' | 'activity' | 'members'
+export type ProjectHubTab =
+  | 'overview'
+  | 'decisions'
+  | 'feedback'
+  | 'pins'
+  | 'dashboards'
+  | 'parts'
+  | 'activity'
+  | 'members'
 
 interface Props {
   active: ProjectHubTab
@@ -25,11 +42,13 @@ interface TabSpec {
 }
 
 const TABS: TabSpec[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'overview', label: 'Overviews', icon: LayoutDashboard },
+  { id: 'decisions', label: 'Tasks', icon: ClipboardList },
+  { id: 'feedback', label: 'Discussions', icon: MessageSquare },
+  { id: 'pins', label: 'Pins', icon: Pin },
+  { id: 'dashboards', label: 'Dashboards', icon: BarChart3 },
   { id: 'parts', label: 'Parts', icon: FileBox },
-  { id: 'decisions', label: 'Decisions', icon: MessageSquare },
-  { id: 'feedback', label: 'Feedback', icon: ClipboardList },
-  { id: 'activity', label: 'Activity', icon: History },
+  { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'members', label: 'Members', icon: Users },
 ]
 
@@ -58,7 +77,7 @@ export default function ProjectHubTabs({ active, onChange, counts }: Props): JSX
           >
             <Icon className="h-3.5 w-3.5" />
             {t.label}
-            {t.id !== 'overview' && (
+            {t.id !== 'overview' && t.id !== 'dashboards' && (
               <span
                 className={[
                   'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',

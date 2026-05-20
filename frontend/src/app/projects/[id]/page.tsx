@@ -21,13 +21,15 @@
 import Link from 'next/link'
 import { notFound, useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, ChevronRight, FileBox, FolderKanban, Inbox } from 'lucide-react'
+import { ArrowUpRight, BarChart3, ChevronRight, FileBox, FolderKanban, Inbox } from 'lucide-react'
 import NotificationsBell from '@/components/layout/NotificationsBell'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import ProjectHubHero from '@/components/projects/ProjectHubHero'
 import ProjectHubTabs, { type ProjectHubTab } from '@/components/projects/ProjectHubTabs'
 import ProjectOverviewTab from '@/components/projects/ProjectOverviewTab'
+import ProjectPinsTab from '@/components/projects/ProjectPinsTab'
 import FeedbackPanel from '@/components/feedback/FeedbackPanel'
+import { useBookmarks } from '@/hooks/useBookmarks'
 import Avatar from '@/components/workspace/Avatar'
 import TeamBadge from '@/components/workspace/TeamBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
@@ -64,6 +66,7 @@ export default function ProjectHubPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [tab, setTab] = useState<ProjectHubTab>('overview')
+  const { bookmarks, toggle: toggleBookmark } = useBookmarks(id)
 
   useEffect(() => {
     let cancelled = false
@@ -159,6 +162,8 @@ export default function ProjectHubPage(): JSX.Element {
     parts: parts.length,
     decisions: decisions.length,
     feedback: decisions.length, // every decision is a feedback row
+    pins: bookmarks.length,
+    dashboards: 0,
     activity: activity.length,
     members: projectMembers.length,
   }
@@ -206,13 +211,37 @@ export default function ProjectHubPage(): JSX.Element {
           {/* Tab content */}
           <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '160ms' }} key={tab}>
             {tab === 'overview' && (
-              <ProjectOverviewTab decisions={decisions} members={projectMembers} />
+              <ProjectOverviewTab
+                decisions={decisions}
+                members={projectMembers}
+                bookmarks={bookmarks}
+                onToggleBookmark={(id) => {
+                  toggleBookmark(id)
+                  setToast({
+                    message: bookmarks.includes(id) ? 'Removed from Pins' : 'Pinned to this project',
+                    tone: 'success',
+                  })
+                }}
+              />
             )}
             {tab === 'parts' && <PartsTab parts={parts} />}
             {tab === 'decisions' && <DecisionsTab decisions={decisions} />}
             {tab === 'feedback' && (
               <FeedbackPanel decisions={decisions} currentUserName={user.name} />
             )}
+            {tab === 'pins' && (
+              <ProjectPinsTab
+                bookmarks={bookmarks}
+                decisions={decisions}
+                members={projectMembers}
+                onUnpin={(id) => {
+                  toggleBookmark(id)
+                  setToast({ message: 'Removed from Pins', tone: 'success' })
+                }}
+                onGoToOverview={() => setTab('overview')}
+              />
+            )}
+            {tab === 'dashboards' && <DashboardsTab onGoToOverview={() => setTab('overview')} />}
             {tab === 'activity' && <ActivityTab activity={activity} />}
             {tab === 'members' && <MembersTab members={projectMembers} projectName={project.name} />}
           </div>
@@ -430,6 +459,28 @@ function MembersTab({ members, projectName }: { members: MockMember[]; projectNa
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function DashboardsTab({ onGoToOverview }: { onGoToOverview: () => void }): JSX.Element {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary">
+        <BarChart3 className="h-6 w-6" />
+      </div>
+      <p className="mt-3 text-sm font-bold text-slate-900">One dashboard for now</p>
+      <p className="mt-1 max-w-md text-[12px] leading-relaxed text-slate-500">
+        The Overview tab is the project&apos;s default dashboard. Saved views and
+        custom dashboards will live here — until then, head back to Overviews.
+      </p>
+      <button
+        type="button"
+        onClick={onGoToOverview}
+        className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-primary-700"
+      >
+        Open Overviews
+      </button>
     </div>
   )
 }

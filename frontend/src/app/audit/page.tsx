@@ -108,6 +108,92 @@ const EXTRA_EVENTS: AuditRow[] = [
     created_at: new Date(NOW - 9 * D).toISOString(),
     payload: { superseded_by: 'DEC-TURBO-V3-08' },
   },
+  // ── Datum AI · Rule #6 audit rows ──────────────────────────────────────
+  // Four canned DATUM_CALLED events — one per user-facing hook — so the
+  // "Datum called" filter has live-shaped data to render. Payload follows
+  // the spec §6 contract verbatim. The real backend also writes these to
+  // the events table for every hook call.
+  {
+    id: 'sys-datum-1',
+    kind: 'DATUM_CALLED',
+    actor_name: 'Ratnapriya',
+    target: 'Suggest rationale · DEC-TURBO-V3-08',
+    created_at: new Date(NOW - 1 * D).toISOString(),
+    payload: {
+      hook: 'suggest-rationale',
+      input: { part_name: 'Compressor Housing v2', anchor_id: 'face-flange-1' },
+      output: {
+        suggestion:
+          'Surface roughness on the inlet flange tightened from Ra 3.2 µm → Ra 1.6 µm to meet sealing requirements per the gasket vendor datasheet.',
+        citations: ['AS9100 §6.4.3'],
+      },
+      confidence: 0.82,
+      latency_ms: 1,
+      source: 'mocked-fallback',
+      declined: false,
+    },
+  },
+  {
+    id: 'sys-datum-2',
+    kind: 'DATUM_CALLED',
+    actor_name: 'Sarah Chen',
+    target: 'Summarize thread · part:demo_1',
+    created_at: new Date(NOW - 0.5 * D).toISOString(),
+    payload: {
+      hook: 'summarize-thread',
+      input: { thread_id: 'part:demo_1', decision_ids: ['DEC-TURBO-V3-11', 'DEC-TURBO-V3-07'] },
+      output: {
+        summary:
+          'Thread centres on a wall-thickness flag at face Z3. Owner committed to a follow-up FEA before signoff.',
+        key_concerns: 3,
+        recommended_action: 'Hold the supplier signoff until the FEA is attached.',
+      },
+      confidence: 0.84,
+      latency_ms: 2,
+      source: 'mocked-fallback',
+      declined: false,
+    },
+  },
+  {
+    id: 'sys-datum-3',
+    kind: 'DATUM_CALLED',
+    actor_name: 'Ratnapriya',
+    target: 'Screen boundary · part:demo_1 (partner view)',
+    created_at: new Date(NOW - 0.2 * D).toISOString(),
+    payload: {
+      hook: 'screen-boundary',
+      input: { thread_id: 'part:demo_1', viewer_role: 'partner', decision_ids_count: 3 },
+      output: {
+        redacted_comment_ids: ['DEC-TURBO-V3-07'],
+        redaction_reasons: { 'DEC-TURBO-V3-07': 'internal-flag' },
+        safe_summary: '1 comment hidden from partner view — internal review notes.',
+      },
+      confidence: 0.78,
+      latency_ms: 1,
+      source: 'mocked-fallback',
+      declined: false,
+    },
+  },
+  {
+    id: 'sys-datum-4',
+    kind: 'DATUM_CALLED',
+    actor_name: 'Ratnapriya',
+    target: 'Flag regressions · demo_2:Rev B',
+    created_at: new Date(NOW - 0.05 * D).toISOString(),
+    payload: {
+      hook: 'flag-regressions',
+      input: { rev_snapshot_id: 'demo_2:Rev B', part_id: 'demo_2' },
+      output: {
+        flagged_count: 3,
+        scanned_count: 12,
+        top_flag: { decision_id: 'DEC-BRACKET-09', likelihood: 0.91, action: 'urgent_review' },
+      },
+      confidence: 0.91,
+      latency_ms: 0,
+      source: 'mocked-fallback',
+      declined: false,
+    },
+  },
 ]
 
 const KIND_STYLE: Record<

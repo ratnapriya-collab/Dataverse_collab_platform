@@ -166,3 +166,20 @@ export interface FlagRegressionsResponse {
   runtime_ms: number
   source: 'llm' | 'mocked-fallback'
 }
+
+// ── Datum AI · Hook 3 · Screen Boundary ───────────────────────────────────
+
+export type ViewerRole = 'admin' | 'oem' | 'partner'
+
+export interface ScreenBoundaryRequest {
+  thread_id: string
+  viewer_role: ViewerRole
+  decision_ids?: string[]
+}
+
+export interface ScreenBoundaryResponse {
+  redacted_comment_ids: string[]
+  redaction_reasons: Record<string, string>
+  safe_summary?: string | null
+  source: 'llm' | 'mocked-fallback'
+}

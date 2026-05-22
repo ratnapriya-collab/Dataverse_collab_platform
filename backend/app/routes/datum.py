@@ -27,6 +27,8 @@ from app.schemas.decision import (
     FlagRegressionsResponse,
     RationaleSuggestion,
     RationaleSuggestRequest,
+    ScreenBoundaryRequest,
+    ScreenBoundaryResponse,
     SummarizeThreadRequest,
     SummarizeThreadResponse,
 )
@@ -272,6 +274,81 @@ def flag_regressions(
         response_payload=response.model_dump(),
         confidence=max((f.likelihood for f in flagged), default=0.0),
         latency_ms=runtime_ms,
+        source=response.source,
+        declined=False,
+    )
+    return response
+
+
+# ── Hook 3: Screen Boundary ────────────────────────────────────────────────
+
+
+# Three redaction reason categories from the spec (matches the existing
+# partner-view client heuristic so admin debug "Show what's hidden" stays
+# consistent across the two surfaces).
+_REDACTION_REASONS = ["internal-flag", "cost-keyword", "admin-only-thread"]
+
+
+@router.post("/screen-boundary", response_model=ScreenBoundaryResponse)
+def screen_boundary(
+    body: ScreenBoundaryRequest,
+    current: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> ScreenBoundaryResponse:
+    """Hook 3 · Screen Boundary (mocked).
+
+    Decides which decisions to redact for a partner viewer. Admin role
+    sees everything; partner/oem roles get a deterministic subset
+    redacted with a stable reason category per ID.
+
+    Phase 2 will replace the deterministic mod-3 selection with a real
+    LLM call that classifies each comment by content sensitivity.
+    """
+    started = time.perf_counter()
+
+    if body.viewer_role == "admin":
+        response = ScreenBoundaryResponse(
+            redacted_comment_ids=[],
+            redaction_reasons={},
+            safe_summary=None,
+        )
+    else:
+        redacted: list[str] = []
+        reasons: dict[str, str] = {}
+        for decision_id in body.decision_ids:
+            digest = sum(ord(c) for c in decision_id)
+            # Roughly 33% get redacted — deterministic across reloads.
+            if digest % 3 == 0:
+                redacted.append(decision_id)
+                reasons[decision_id] = _REDACTION_REASONS[digest % 3]
+        count = len(redacted)
+        if count == 0:
+            safe_summary = None
+        else:
+            safe_summary = (
+                f"{count} comment{'s' if count != 1 else ''} hidden from {body.viewer_role} "
+                f"view by Datum — internal review notes, cost-sensitive content, or "
+                f"admin-only threads."
+            )
+        response = ScreenBoundaryResponse(
+            redacted_comment_ids=redacted,
+            redaction_reasons=reasons,
+            safe_summary=safe_summary,
+        )
+
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    _audit_datum_call(
+        session,
+        hook="screen-boundary",
+        actor_id=current.id,
+        subject_id=body.thread_id,
+        request_payload=body.model_dump(),
+        response_payload=response.model_dump(),
+        # Confidence is high for admin (nothing to redact) and 0.78 mocked
+        # for partner/oem so the spec's "every output has a confidence" rule
+        # is satisfied. Phase 2 will compute this from the LLM classifier.
+        confidence=1.0 if body.viewer_role == "admin" else 0.78,
+        latency_ms=latency_ms,
         source=response.source,
         declined=False,
     )

@@ -15,6 +15,8 @@ import type {
   FlagRegressionsRequest,
   FlagRegressionsResponse,
   RationaleSuggestion,
+  ScreenBoundaryRequest,
+  ScreenBoundaryResponse,
   SummarizeThreadRequest,
   SummarizeThreadResponse,
   TokenResponse,
@@ -223,6 +225,13 @@ export const api = {
     },
     flagRegressions(body: FlagRegressionsRequest): Promise<FlagRegressionsResponse> {
       return request<FlagRegressionsResponse>('/api/datum/flag-regressions', {
+        method: 'POST',
+        body,
+        auth: true,
+      })
+    },
+    screenBoundary(body: ScreenBoundaryRequest): Promise<ScreenBoundaryResponse> {
+      return request<ScreenBoundaryResponse>('/api/datum/screen-boundary', {
         method: 'POST',
         body,
         auth: true,

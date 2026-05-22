@@ -185,6 +185,12 @@ export default function PartPage() {
   const [error, setError] = useState<string | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [slowWarning, setSlowWarning] = useState(false)
+  const [screenSignal, setScreenSignal] = useState<{
+    redactedCount: number
+    safeSummary?: string | null
+    source: string
+    confidence?: number
+  } | null>(null)
 
   // Face-pick & modal flow.
   //
@@ -306,6 +312,40 @@ export default function PartPage() {
   // would deep-comment-scan; here we just attribute 2 redacted comments per
   // hidden decision so the banner shows realistic numbers).
   const hiddenCommentsCount = redactedDecisions.length * 2
+
+  // Datum AI · Hook 3 · Screen Boundary
+  // Call once per (part, role) when partner/oem view becomes active. The
+  // response writes a DATUM_CALLED audit row on the backend (Rule #6) and
+  // surfaces a "Live screen" badge in the redaction explainer. Fire-and-forget;
+  // failures are non-fatal — the client heuristic still drives the actual UI
+  // redaction so partner view always works even if Datum is offline.
+  useEffect(() => {
+    if (!isPartner || partId === undefined || partId === null || partId === '') return
+    if (decisions.length === 0) return
+    let cancelled = false
+    api.datum
+      .screenBoundary({
+        thread_id: `part:${partId}`,
+        viewer_role: activeRole,
+        decision_ids: decisions.map((d) => d.id),
+      })
+      .then((res) => {
+        if (cancelled) return
+        setScreenSignal({
+          redactedCount: res.redacted_comment_ids.length,
+          safeSummary: res.safe_summary,
+          source: res.source,
+          confidence: res.redacted_comment_ids.length > 0 ? 0.78 : 1.0,
+        })
+      })
+      .catch(() => {
+        // Non-fatal — clear any stale signal so the badge disappears cleanly.
+        if (!cancelled) setScreenSignal(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isPartner, partId, activeRole, decisions])
 
   // Decisions actually used to build labels + the side panel.
   const labelSourceDecisions = isPartner && !showWhatsHidden ? visibleDecisions : decisions
@@ -507,6 +547,7 @@ export default function PartPage() {
           isPartner={isPartner}
           showWhatsHidden={showWhatsHidden}
           hiddenCommentsCount={hiddenCommentsCount}
+          screenSignal={screenSignal}
           reasonFor={redactionReason}
         />
 

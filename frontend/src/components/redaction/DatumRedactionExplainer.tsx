@@ -5,16 +5,24 @@
  * explaining how Datum decides what to hide.
  */
 
-import { ChevronRight, FileText, MessageSquareWarning, Shield, Sparkles } from 'lucide-react'
+import { CheckCircle2, ChevronRight, FileText, MessageSquareWarning, Shield, Sparkles } from 'lucide-react'
 
 interface Props {
   hiddenDecisions: number
   hiddenComments: number
+  /** Datum AI · Hook 3 result — when present, surfaces the "Live screen" badge. */
+  screenSignal?: {
+    redactedCount: number
+    safeSummary?: string | null
+    source: string
+    confidence?: number
+  } | null
 }
 
 export default function DatumRedactionExplainer({
   hiddenDecisions,
   hiddenComments,
+  screenSignal,
 }: Props): JSX.Element {
   return (
     <aside className="overflow-hidden rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 via-white to-purple-50/40 shadow-sm">
@@ -22,10 +30,24 @@ export default function DatumRedactionExplainer({
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold text-purple-900">Datum</p>
           <p className="text-[10px] text-purple-700/80">AI · redaction co-pilot</p>
         </div>
+        {screenSignal !== null && screenSignal !== undefined && (
+          <span
+            title={`Datum scanned this thread · source: ${screenSignal.source}`}
+            className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200"
+          >
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            Live screen
+            {typeof screenSignal.confidence === 'number' && (
+              <span className="ml-1 font-mono tabular-nums">
+                {Math.round(screenSignal.confidence * 100)}%
+              </span>
+            )}
+          </span>
+        )}
       </header>
       <div className="px-3 py-3">
         <p className="text-[11px] font-semibold text-purple-900">
@@ -63,6 +85,15 @@ export default function DatumRedactionExplainer({
             <>nothing to redact — partner sees the full picture.</>
           )}
         </div>
+
+        {screenSignal !== null && screenSignal !== undefined && screenSignal.safeSummary !== null && screenSignal.safeSummary !== undefined && (
+          <div className="mt-2 rounded-md border border-purple-100 bg-purple-50/70 px-2.5 py-1.5 text-[10px] leading-snug text-purple-800">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-purple-600">
+              Datum&apos;s safe summary
+            </p>
+            <p className="mt-0.5">{screenSignal.safeSummary}</p>
+          </div>
+        )}
 
         <a
           href="#"

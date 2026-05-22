@@ -75,6 +75,13 @@ interface Props {
   isPartner: boolean
   showWhatsHidden: boolean
   hiddenCommentsCount: number
+  /** Datum AI · Hook 3 result — surfaces the "Live screen" badge in the explainer. */
+  screenSignal?: {
+    redactedCount: number
+    safeSummary?: string | null
+    source: string
+    confidence?: number
+  } | null
 
   // Redaction reason resolver — owned by the page (same regex as Day 5)
   reasonFor: (d: DecisionRead) => 'internal-flag' | 'cost-keyword' | 'admin-only-thread' | null
@@ -95,6 +102,7 @@ export default function PartConversationHub({
   isPartner,
   showWhatsHidden,
   hiddenCommentsCount,
+  screenSignal,
   reasonFor,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<HubTab>('comments')
@@ -164,6 +172,7 @@ export default function PartConversationHub({
           <DatumRedactionExplainer
             hiddenDecisions={redactedDecisions.length}
             hiddenComments={hiddenCommentsCount}
+            screenSignal={screenSignal}
           />
           {redactedDecisions.length > 0 && (
             <>

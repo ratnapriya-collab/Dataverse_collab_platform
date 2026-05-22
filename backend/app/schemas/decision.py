@@ -155,3 +155,27 @@ class FlagRegressionsResponse(BaseModel):
     scanned_count: int
     runtime_ms: int
     source: str = "mocked-fallback"
+
+
+# ── Hook 3: Screen Boundary ─────────────────────────────────────────────────
+
+
+class ScreenBoundaryRequest(BaseModel):
+    """Ask Datum which decisions to redact for a partner viewer."""
+
+    thread_id: str = Field(min_length=1)
+    viewer_role: str = "partner"  # 'admin' | 'oem' | 'partner'
+    decision_ids: list[str] = Field(default_factory=list)
+
+
+class ScreenBoundaryResponse(BaseModel):
+    """List of redacted decision IDs plus the reason category for each.
+
+    redaction_reasons keys must be subset of redacted_comment_ids.
+    safe_summary is what the partner sees in place of the hidden content.
+    """
+
+    redacted_comment_ids: list[str]
+    redaction_reasons: dict[str, str]
+    safe_summary: str | None = None
+    source: str = "mocked-fallback"

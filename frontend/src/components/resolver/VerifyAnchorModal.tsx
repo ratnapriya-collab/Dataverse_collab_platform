@@ -36,11 +36,28 @@ export default function VerifyAnchorModal({
   onReject,
   onClose,
 }: Props): JSX.Element | null {
-  // ESC to close + body-scroll lock
+  // Keyboard shortcuts: ESC close · A accept · R reject (matches the footer hint).
+  // Body-scroll lock applied while open.
   useEffect(() => {
-    if (!open) return
+    if (!open || bucket === null) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      // Ignore if any input/textarea is focused so the user can still type freely.
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable === true) return
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        onAccept(bucket.decision_id)
+        return
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        onReject(bucket.decision_id)
+      }
     }
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
@@ -49,7 +66,7 @@ export default function VerifyAnchorModal({
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [open, onClose])
+  }, [open, bucket, onAccept, onReject, onClose])
 
   if (!open || bucket === null) return null
 

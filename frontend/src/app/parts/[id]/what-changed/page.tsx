@@ -330,7 +330,20 @@ export default function WhatChangedPage(): JSX.Element {
                     )}
                   </p>
                 ))}
-                <p className="mt-1 text-[11px] text-rose-700/70">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-rose-700/80">
+                  <span className="inline-flex items-center gap-0.5">
+                    <span className="font-semibold text-rose-900">Impact:</span> 2 mating parts ·
+                    CAE re-approval required
+                  </span>
+                  <span className="text-rose-300">·</span>
+                  <span>Estimated rework cost: ~$1.4k</span>
+                  <span className="text-rose-300">·</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <Sparkles className="h-2.5 w-2.5 text-violet-500" />
+                    Datum scan below cross-references this
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] font-semibold text-rose-700/70">
                   Review immediately before this rev ships.
                 </p>
               </div>

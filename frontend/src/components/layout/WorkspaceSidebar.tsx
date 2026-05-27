@@ -129,7 +129,7 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
   const allBookmarks = useAllBookmarks()
 
   const items: NavItem[] = [
-    { id: 'dashboard', label: 'My Overview', icon: Activity, href: '/workspace' },
+    { id: 'dashboard', label: 'My Overview', icon: Activity, href: '/my-overview' },
     {
       id: 'my_work',
       label: 'My Tasks',

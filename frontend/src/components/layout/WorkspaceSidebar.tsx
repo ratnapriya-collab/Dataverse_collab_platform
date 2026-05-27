@@ -148,9 +148,21 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
   const workspaceProjects = SEED_PROJECTS.slice(0, 4)
 
   return (
+    <>
+      {/* Floating "show sidebar" button — only visible when sidebar is fully hidden. */}
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label="Show sidebar"
+          className="dv-anim-fade-in fixed left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-md transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+      )}
     <aside
-      style={{ width: collapsed ? 60 : 220 }}
-      className="sticky top-0 flex h-screen shrink-0 flex-col border-r border-slate-200 bg-gradient-to-b from-white via-white to-slate-50/80 shadow-[1px_0_0_0_rgba(15,23,42,0.04)] transition-[width] duration-200"
+      style={{ width: collapsed ? 0 : 220 }}
+      className="sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-white via-white to-slate-50/80 shadow-[1px_0_0_0_rgba(15,23,42,0.04)] transition-[width] duration-200"
     >
       {/* ── Hamburger + Brand ──────────────────────────────────────────── */}
       <div className="flex items-center gap-2 border-b border-slate-200/80 px-3 py-3.5">
@@ -533,5 +545,6 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
         )}
       </div>
     </aside>
+    </>
   )
 }

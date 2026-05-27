@@ -15,19 +15,14 @@ import {
 import NotificationsBell from '@/components/layout/NotificationsBell'
 import QuickActionsFAB from '@/components/layout/QuickActionsFAB'
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
-import ActivityFeed from '@/components/workspace/ActivityFeed'
 import { AvatarStack } from '@/components/workspace/Avatar'
-import PendingDecisionsCard from '@/components/workspace/PendingDecisionsCard'
 import ProjectsGrid from '@/components/workspace/ProjectsGrid'
 import StatCard from '@/components/workspace/StatCard'
-import TeamCard from '@/components/workspace/TeamCard'
 import { ApiError, api } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import {
-  SEED_ACTIVITY,
   SEED_INVITES,
   SEED_MEMBERS,
-  SEED_PENDING_DECISIONS,
   SEED_PROJECTS,
   SEED_WORKSPACE,
   SEED_WORKSPACES,
@@ -91,8 +86,6 @@ export default function WorkspacePage() {
     [user],
   )
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
-  // Pretend Sarah and David are online — the green dot is purely aesthetic.
-  const onlineNames = useMemo(() => new Set(['Sarah Chen', 'David Kim']), [])
   const adminCount = useMemo(() => members.filter((m) => m.role === 'ADMIN').length, [members])
   const pendingInvites = useMemo(() => SEED_INVITES.filter((i) => !i.used).length, [])
   const openComments = useMemo(
@@ -340,18 +333,6 @@ export default function WorkspacePage() {
           style={{ animationDelay: '380ms' }}
         >
           <ProjectsGrid projects={workspaceProjects} />
-        </div>
-
-        {/* ── Supporting cards: activity / pending / team ────────────────── */}
-        <div
-          className="dv-anim-fade-up mt-10 grid gap-6 lg:grid-cols-[1.4fr_1fr]"
-          style={{ animationDelay: '480ms' }}
-        >
-          <ActivityFeed entries={SEED_ACTIVITY} limit={6} />
-          <div className="space-y-4">
-            <PendingDecisionsCard decisions={SEED_PENDING_DECISIONS} />
-            <TeamCard members={members} onlineNames={onlineNames} />
-          </div>
         </div>
 
         <p className="mt-12 text-center text-[11px] text-slate-400">

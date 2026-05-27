@@ -23,6 +23,7 @@ import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar'
 import ActivityFeed from '@/components/workspace/ActivityFeed'
 import { AvatarStack } from '@/components/workspace/Avatar'
 import PendingDecisionsCard from '@/components/workspace/PendingDecisionsCard'
+import ProjectsGrid from '@/components/workspace/ProjectsGrid'
 import StatCard from '@/components/workspace/StatCard'
 import TeamCard from '@/components/workspace/TeamCard'
 import { ApiError, api } from '@/lib/api'
@@ -73,10 +74,13 @@ export default function MyOverviewPage() {
       SEED_ACTIVITY.filter((a) => a.snippet?.toLowerCase().includes('@you') ?? false).length,
     [],
   )
-  const myActiveProjects = useMemo(
-    () => SEED_PROJECTS.filter((p) => p.member_names.includes('You')).length,
+  // The actual projects the current user collaborates on — drives the
+  // "Your projects" grid AND the stat-card count.
+  const myProjects = useMemo(
+    () => SEED_PROJECTS.filter((p) => p.member_names.includes('You')),
     [],
   )
+  const myActiveProjects = myProjects.length
   // Pretend Sarah and David are online — the green dot is purely aesthetic.
   const onlineNames = useMemo(() => new Set(['Sarah Chen', 'David Kim']), [])
 
@@ -183,10 +187,35 @@ export default function MyOverviewPage() {
             </div>
           </div>
 
+          {/* ── Your projects (centerpiece for the personal lens) ──────────── */}
+          <div className="dv-anim-fade-up mt-8" style={{ animationDelay: '300ms' }}>
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 className="text-[15px] font-bold tracking-tight text-slate-900">
+                Your projects
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {myProjects.length} project{myProjects.length === 1 ? '' : 's'} you&rsquo;re
+                collaborating on
+              </p>
+            </div>
+            {myProjects.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+                <p className="text-sm font-semibold text-slate-700">
+                  You&rsquo;re not on any projects yet
+                </p>
+                <p className="mt-1 text-[12px] text-slate-500">
+                  Ask a teammate to add you, or head to a Workspace to upload a part.
+                </p>
+              </div>
+            ) : (
+              <ProjectsGrid projects={myProjects} />
+            )}
+          </div>
+
           {/* ── Supporting cards: activity / pending / team ──────────────── */}
           <div
-            className="dv-anim-fade-up mt-8 grid gap-6 lg:grid-cols-[1.4fr_1fr]"
-            style={{ animationDelay: '320ms' }}
+            className="dv-anim-fade-up mt-10 grid gap-6 lg:grid-cols-[1.4fr_1fr]"
+            style={{ animationDelay: '400ms' }}
           >
             <ActivityFeed entries={SEED_ACTIVITY} limit={6} />
             <div className="space-y-4">

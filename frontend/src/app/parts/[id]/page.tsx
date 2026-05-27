@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import CreateDecisionModal from '@/components/decisions/CreateDecisionModal'
@@ -191,6 +191,9 @@ export default function PartPage() {
     source: string
     confidence?: number
   } | null>(null)
+  // Right rail (conversation hub) collapse state — gives the 3D viewer the
+  // full width when the user wants to focus on geometry without distractions.
+  const [rightRailCollapsed, setRightRailCollapsed] = useState(false)
 
   // Face-pick & modal flow.
   //
@@ -487,6 +490,25 @@ export default function PartPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setRightRailCollapsed((c) => !c)}
+              aria-label={rightRailCollapsed ? 'Show conversation panel' : 'Hide conversation panel'}
+              aria-pressed={rightRailCollapsed}
+              title={rightRailCollapsed ? 'Show conversation panel' : 'Hide conversation panel (more space for the 3D viewer)'}
+              className={[
+                'inline-flex h-8 w-8 items-center justify-center rounded-md border transition',
+                rightRailCollapsed
+                  ? 'border-primary/30 bg-primary-50 text-primary hover:bg-primary-100'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900',
+              ].join(' ')}
+            >
+              {rightRailCollapsed ? (
+                <PanelRightOpen className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </button>
             <RoleSwitcher active={activeRole} />
             <span className="hidden h-5 w-px bg-slate-200 sm:inline-block" aria-hidden="true" />
             <UserBadge name={user.name} email={user.email} />
@@ -520,7 +542,12 @@ export default function PartPage() {
         contextChip={`${labels.length} pins · ${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}`}
       />
 
-      <section className="grid flex-1 grid-cols-[1fr_360px] overflow-hidden">
+      <section
+        className={[
+          'grid flex-1 overflow-hidden transition-[grid-template-columns] duration-200',
+          rightRailCollapsed ? 'grid-cols-[1fr]' : 'grid-cols-[1fr_360px]',
+        ].join(' ')}
+      >
         <div className="relative bg-slate-100">
           <ViewerCanvas
             onFacePick={handleFacePick}
@@ -531,25 +558,29 @@ export default function PartPage() {
           />
         </div>
 
-        {/* Right rail — Part conversation hub (compact, tabbed) */}
-        <PartConversationHub
-          partId={part.id}
-          partName={part.name}
-          partFileName={part.file_name}
-          partContentHash={part.content_hash}
-          partCreatedAt={part.created_at}
-          decisions={decisions}
-          visibleDecisions={visibleDecisions}
-          redactedDecisions={redactedDecisions}
-          onDecisionChanged={handleDecisionChanged}
-          highlightedFaceUuid={hoveredFaceUuid}
-          onHoverDecision={setHoveredFaceUuid}
-          isPartner={isPartner}
-          showWhatsHidden={showWhatsHidden}
-          hiddenCommentsCount={hiddenCommentsCount}
-          screenSignal={screenSignal}
-          reasonFor={redactionReason}
-        />
+        {/* Right rail — Part conversation hub (compact, tabbed).
+            Fully hidden when collapsed → the 3D viewer takes the full width.
+            The toggle button lives in the page header (top-right). */}
+        {!rightRailCollapsed && (
+          <PartConversationHub
+            partId={part.id}
+            partName={part.name}
+            partFileName={part.file_name}
+            partContentHash={part.content_hash}
+            partCreatedAt={part.created_at}
+            decisions={decisions}
+            visibleDecisions={visibleDecisions}
+            redactedDecisions={redactedDecisions}
+            onDecisionChanged={handleDecisionChanged}
+            highlightedFaceUuid={hoveredFaceUuid}
+            onHoverDecision={setHoveredFaceUuid}
+            isPartner={isPartner}
+            showWhatsHidden={showWhatsHidden}
+            hiddenCommentsCount={hiddenCommentsCount}
+            screenSignal={screenSignal}
+            reasonFor={redactionReason}
+          />
+        )}
 
         {/* STEP-stub notice was moved into the hub footer once partner mode
             is off — surface only when relevant. Inline here for now so we

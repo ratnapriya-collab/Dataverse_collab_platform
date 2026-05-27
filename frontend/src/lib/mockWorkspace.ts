@@ -169,6 +169,31 @@ export const SEED_WORKSPACE: MockWorkspace = {
 }
 
 /**
+ * Multi-workspace seed — each workspace owns a distinct subset of projects.
+ * The sidebar shows all three; clicking one filters the /workspace dashboard
+ * to that workspace's projects via ?ws=<id>.
+ */
+export const SEED_WORKSPACES: MockWorkspace[] = [
+  SEED_WORKSPACE,
+  {
+    id: 'ws_aerospace',
+    name: 'Aerospace Alpha',
+    slug: 'aerospace-alpha',
+    description:
+      'Aerospace primary structures workspace — wing spars, bracket assemblies, and load-bearing geometry under AS9100 review.',
+    created_at: new Date(NOW - 60 * DAYS).toISOString(),
+  },
+  {
+    id: 'ws_thermal',
+    name: 'Thermal Systems',
+    slug: 'thermal-systems',
+    description:
+      'Heat exchanger and thermal-management workspace — CFD-driven design with supplier-collaboration on tube geometry.',
+    created_at: new Date(NOW - 30 * DAYS).toISOString(),
+  },
+]
+
+/**
  * Build the seed members list. The first entry is reserved for the currently
  * signed-in user — call `withCurrentUser` to fill it in before rendering.
  */
@@ -367,6 +392,8 @@ export interface MockProject {
   last_activity_at: string
   /** Per-team handoff status — drives the PipelineStrip on project cards. */
   pipeline: ProjectPipeline
+  /** Which SEED_WORKSPACES entry this project belongs to. */
+  workspace_id: string
 }
 
 export const SEED_PROJECTS: MockProject[] = [
@@ -389,6 +416,7 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'PENDING',
       MANUFACTURING: 'PENDING',
     },
+    workspace_id: 'ws_demo',
   },
   {
     id: 'proj_bracket',
@@ -409,6 +437,7 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'PENDING',
       MANUFACTURING: 'PENDING',
     },
+    workspace_id: 'ws_aerospace',
   },
   {
     id: 'proj_gear',
@@ -429,6 +458,7 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'IN_PROGRESS',
       MANUFACTURING: 'PENDING',
     },
+    workspace_id: 'ws_aerospace',
   },
   {
     id: 'proj_intake',
@@ -449,6 +479,7 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'BLOCKED',
       MANUFACTURING: 'PENDING',
     },
+    workspace_id: 'ws_demo',
   },
   {
     id: 'proj_plate',
@@ -469,6 +500,7 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'PENDING',
       MANUFACTURING: 'PENDING',
     },
+    workspace_id: 'ws_thermal',
   },
   {
     id: 'proj_cooling',
@@ -489,11 +521,20 @@ export const SEED_PROJECTS: MockProject[] = [
       SUPPLIER: 'DONE',
       MANUFACTURING: 'DONE',
     },
+    workspace_id: 'ws_thermal',
   },
 ]
 
 export function getProject(id: string): MockProject | undefined {
   return SEED_PROJECTS.find((p) => p.id === id)
+}
+
+export function getWorkspace(id: string): MockWorkspace | undefined {
+  return SEED_WORKSPACES.find((w) => w.id === id)
+}
+
+export function getProjectsByWorkspace(workspaceId: string): MockProject[] {
+  return SEED_PROJECTS.filter((p) => p.workspace_id === workspaceId)
 }
 
 // ── Activity feed ────────────────────────────────────────────────────────────

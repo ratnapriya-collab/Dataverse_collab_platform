@@ -30,6 +30,7 @@ import ProjectOverviewTab from '@/components/projects/ProjectOverviewTab'
 import ProjectPinsTab from '@/components/projects/ProjectPinsTab'
 import FeedbackPanel from '@/components/feedback/FeedbackPanel'
 import { useBookmarks } from '@/hooks/useBookmarks'
+import { useRecordRecentlyViewed } from '@/hooks/useRecentlyViewed'
 import Avatar from '@/components/workspace/Avatar'
 import TeamBadge from '@/components/workspace/TeamBadge'
 import Toast, { type ToastState } from '@/components/ui/Toast'
@@ -95,6 +96,10 @@ export default function ProjectHubPage(): JSX.Element {
   }, [searchParams])
 
   const { bookmarks, toggle: toggleBookmark } = useBookmarks(id)
+
+  // Record the project in the user's recently-viewed list (localStorage).
+  // Renders on the workspace dashboard's "Recently viewed" section.
+  useRecordRecentlyViewed(project?.id)
 
   useEffect(() => {
     let cancelled = false

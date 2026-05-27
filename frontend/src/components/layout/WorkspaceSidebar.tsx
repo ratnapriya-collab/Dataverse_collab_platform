@@ -43,7 +43,7 @@ import { HexMark } from '@/components/ui/Logo'
 import Avatar from '@/components/workspace/Avatar'
 import { CARD_TITLES, type CardId } from '@/components/projects/ProjectOverviewTab'
 import { useAllBookmarks } from '@/hooks/useBookmarks'
-import { SEED_PROJECTS, SEED_WORK_ITEMS } from '@/lib/mockWorkspace'
+import { SEED_PROJECTS, SEED_WORK_ITEMS, SEED_WORKSPACES, getProjectsByWorkspace } from '@/lib/mockWorkspace'
 import type { UserRead } from '@/types/api'
 
 export type SidebarSection =
@@ -85,6 +85,18 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [workspaceOpen, setWorkspaceOpen] = useState(true)
+  // Per-workspace expand/collapse state — Set of workspace IDs that are expanded.
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(
+    () => new Set(SEED_WORKSPACES.map((w) => w.id)),
+  )
+  const toggleWorkspace = (id: string): void => {
+    setExpandedWorkspaces((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
   const [tab, setTab] = useState<'workspaces' | 'bookmarks'>('workspaces')
 
   const userMenuRef = useRef<HTMLDivElement | null>(null)
@@ -405,36 +417,63 @@ export default function WorkspaceSidebar({ user, current, onSignOut }: Props) {
                   </button>
                 </div>
                 {workspaceOpen && (
-                  <div className="space-y-0.5">
-                    <Link
-                      href="/workspace"
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-semibold text-slate-800 transition hover:bg-slate-100/70"
-                    >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gradient-to-br from-primary to-brand text-[10px] font-black text-white shadow-sm">
-                        F
-                      </span>
-                      <span className="flex-1 truncate">F-Bracket Program</span>
-                      <ChevronDown className="h-3 w-3 text-slate-400" />
-                    </Link>
-                    <ul className="ml-3 space-y-0.5 border-l border-slate-100 pl-2">
-                      {workspaceProjects.map((p) => (
-                        <li key={p.id}>
-                          <Link
-                            href={`/projects/${p.id}`}
-                            className="flex items-center gap-2 rounded-md px-2 py-1 text-[11.5px] text-slate-600 transition hover:bg-slate-100/70 hover:text-slate-900"
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                TONE_DOT[p.tone] ?? 'bg-slate-400'
-                              }`}
-                            />
-                            <span className="truncate">
-                              {p.name.split(' ').slice(0, 3).join(' ')}
-                            </span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="space-y-1.5">
+                    {SEED_WORKSPACES.map((ws) => {
+                      const expanded = expandedWorkspaces.has(ws.id)
+                      const projects = getProjectsByWorkspace(ws.id)
+                      const initial = ws.name.charAt(0).toUpperCase()
+                      return (
+                        <div key={ws.id} className="space-y-0.5">
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/workspace?ws=${ws.id}`}
+                              className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-semibold text-slate-800 transition hover:bg-slate-100/70"
+                            >
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gradient-to-br from-primary to-brand text-[10px] font-black text-white shadow-sm">
+                                {initial}
+                              </span>
+                              <span className="flex-1 truncate">{ws.name}</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => toggleWorkspace(ws.id)}
+                              aria-label={expanded ? `Collapse ${ws.name}` : `Expand ${ws.name}`}
+                              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <ChevronDown
+                                className={`h-3 w-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                              />
+                            </button>
+                          </div>
+                          {expanded && projects.length > 0 && (
+                            <ul className="ml-3 space-y-0.5 border-l border-slate-100 pl-2">
+                              {projects.map((p) => (
+                                <li key={p.id}>
+                                  <Link
+                                    href={`/projects/${p.id}`}
+                                    className="flex items-center gap-2 rounded-md px-2 py-1 text-[11.5px] text-slate-600 transition hover:bg-slate-100/70 hover:text-slate-900"
+                                  >
+                                    <span
+                                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                        TONE_DOT[p.tone] ?? 'bg-slate-400'
+                                      }`}
+                                    />
+                                    <span className="truncate">
+                                      {p.name.split(' ').slice(0, 3).join(' ')}
+                                    </span>
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {expanded && projects.length === 0 && (
+                            <p className="ml-3 px-2 py-1 text-[10.5px] italic text-slate-400">
+                              No projects yet
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

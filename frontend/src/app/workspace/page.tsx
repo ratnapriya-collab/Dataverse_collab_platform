@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Building2,
@@ -30,14 +30,40 @@ import {
   SEED_PENDING_DECISIONS,
   SEED_PROJECTS,
   SEED_WORKSPACE,
+  SEED_WORKSPACES,
+  getProjectsByWorkspace,
+  getWorkspace,
   withCurrentUser,
 } from '@/lib/mockWorkspace'
+import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
 import type { UserRead } from '@/types/api'
 
 export default function WorkspacePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Active workspace — driven by ?ws=<id>. Falls back to the demo workspace.
+  const wsParam = searchParams?.get('ws') ?? null
+  const activeWorkspace = useMemo(() => {
+    return (wsParam !== null ? getWorkspace(wsParam) : undefined) ?? SEED_WORKSPACE
+  }, [wsParam])
+  // Projects scoped to the active workspace. The dashboard's grid + stat cards
+  // all derive from this so the page truly "switches" when you change ws.
+  const workspaceProjects = useMemo(
+    () => getProjectsByWorkspace(activeWorkspace.id),
+    [activeWorkspace],
+  )
+  // Recently-viewed list, hydrated from localStorage on mount + storage events.
+  const recentEntries = useRecentlyViewed()
+  const recentProjects = useMemo(() => {
+    const ordered = recentEntries
+      .map((e) => SEED_PROJECTS.find((p) => p.id === e.projectId))
+      .filter((p): p is (typeof SEED_PROJECTS)[number] => p !== undefined)
+    // Top 6 keeps the grid compact + readable.
+    return ordered.slice(0, 6)
+  }, [recentEntries])
 
   useEffect(() => {
     let cancelled = false
@@ -70,16 +96,16 @@ export default function WorkspacePage() {
   const adminCount = useMemo(() => members.filter((m) => m.role === 'ADMIN').length, [members])
   const pendingInvites = useMemo(() => SEED_INVITES.filter((i) => !i.used).length, [])
   const openComments = useMemo(
-    () => SEED_PROJECTS.reduce((sum, p) => sum + p.open_comments, 0),
-    [],
+    () => workspaceProjects.reduce((sum, p) => sum + p.open_comments, 0),
+    [workspaceProjects],
   )
   const totalParts = useMemo(
-    () => SEED_PROJECTS.reduce((sum, p) => sum + p.parts_count, 0),
-    [],
+    () => workspaceProjects.reduce((sum, p) => sum + p.parts_count, 0),
+    [workspaceProjects],
   )
   const activeProjects = useMemo(
-    () => SEED_PROJECTS.filter((p) => p.status === 'ACTIVE' || p.status === 'IN_REVIEW').length,
-    [],
+    () => workspaceProjects.filter((p) => p.status === 'ACTIVE' || p.status === 'IN_REVIEW').length,
+    [workspaceProjects],
   )
 
   function handleSignOut(): void {
@@ -143,10 +169,10 @@ export default function WorkspacePage() {
                 Workspace
               </div>
               <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
-                {SEED_WORKSPACE.name}
+                {activeWorkspace.name}
               </h1>
               <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/65">
-                {SEED_WORKSPACE.description}
+                {activeWorkspace.description}
               </p>
               <div className="mt-3 flex items-center gap-3 text-xs text-white/70">
                 <AvatarStack names={memberNames} size="sm" max={5} />
@@ -156,10 +182,41 @@ export default function WorkspacePage() {
                 </span>
                 <span className="text-white/20">·</span>
                 <span>
-                  <span className="font-semibold text-white">{SEED_PROJECTS.length}</span>{' '}
+                  <span className="font-semibold text-white">{workspaceProjects.length}</span>{' '}
                   projects
                 </span>
               </div>
+              {/* Workspace switcher chips */}
+              <nav
+                aria-label="Switch workspace"
+                className="mt-4 flex flex-wrap gap-1.5"
+              >
+                {SEED_WORKSPACES.map((ws) => {
+                  const isActive = ws.id === activeWorkspace.id
+                  return (
+                    <Link
+                      key={ws.id}
+                      href={`/workspace?ws=${ws.id}`}
+                      className={[
+                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition',
+                        isActive
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'border border-white/20 bg-white/10 text-white/80 backdrop-blur hover:bg-white/15 hover:text-white',
+                      ].join(' ')}
+                    >
+                      <span
+                        className={[
+                          'flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black',
+                          isActive ? 'bg-primary text-white' : 'bg-white/15 text-white',
+                        ].join(' ')}
+                      >
+                        {ws.name.charAt(0).toUpperCase()}
+                      </span>
+                      {ws.name}
+                    </Link>
+                  )
+                })}
+              </nav>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -194,8 +251,8 @@ export default function WorkspacePage() {
             <StatCard
               icon={FolderKanban}
               label="Projects in workspace"
-              value={SEED_PROJECTS.length}
-              hint={`${activeProjects} active · ${SEED_PROJECTS.length - activeProjects} done`}
+              value={workspaceProjects.length}
+              hint={`${activeProjects} active · ${workspaceProjects.length - activeProjects} done`}
               accent="text-violet-600"
               accentBg="bg-violet-50"
               trend={[2, 3, 3, 2, 4, 3, 4]}
@@ -236,12 +293,53 @@ export default function WorkspacePage() {
           </div>
         </div>
 
+        {/* ── Recently viewed ────────────────────────────────────────────── */}
+        {recentProjects.length > 0 && (
+          <div
+            className="dv-anim-fade-up mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            style={{ animationDelay: '340ms' }}
+          >
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2 className="text-[13px] font-bold tracking-tight text-slate-900">
+                Recently viewed
+              </h2>
+              <p className="text-[10.5px] text-slate-500">
+                {recentProjects.length} project{recentProjects.length === 1 ? '' : 's'} you opened
+                lately
+              </p>
+            </div>
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {recentProjects.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/projects/${p.id}`}
+                    className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50/40 px-3 py-2 transition hover:-translate-y-px hover:border-primary/40 hover:bg-white hover:shadow-sm"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gradient-to-br from-primary/80 to-brand text-[10px] font-black text-white shadow-sm">
+                      {p.name.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-semibold text-slate-900">
+                        {p.name}
+                      </p>
+                      <p className="truncate text-[10px] text-slate-500">
+                        {getWorkspace(p.workspace_id)?.name ?? 'Workspace'} ·{' '}
+                        {p.parts_count} parts · {p.open_comments} open
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* ── Projects grid (centerpiece) ────────────────────────────────── */}
         <div
           className="dv-anim-fade-up mt-8"
           style={{ animationDelay: '380ms' }}
         >
-          <ProjectsGrid projects={SEED_PROJECTS} />
+          <ProjectsGrid projects={workspaceProjects} />
         </div>
 
         {/* ── Supporting cards: activity / pending / team ────────────────── */}

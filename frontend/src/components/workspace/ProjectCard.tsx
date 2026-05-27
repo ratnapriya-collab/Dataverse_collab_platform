@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { ArrowUpRight, Box, MessageCircle } from 'lucide-react'
 import { AvatarStack } from './Avatar'
-import PipelineStrip from './PipelineStrip'
 import ProjectThumbnail from './ProjectThumbnail'
 import { formatTimeAgo, type MockProject, type ProjectStatus } from '@/lib/mockWorkspace'
 
@@ -92,10 +91,6 @@ export default function ProjectCard({ project }: Props) {
         </div>
       </div>
 
-      {/* Pipeline strip — multi-team handoff at a glance */}
-      <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3">
-        <PipelineStrip pipeline={project.pipeline} />
-      </div>
     </Link>
   )
 }

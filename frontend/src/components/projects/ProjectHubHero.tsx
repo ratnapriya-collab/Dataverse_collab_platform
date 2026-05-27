@@ -7,7 +7,6 @@
  *   • title · description · status pill
  *   • parts / open-comments / members stat strip
  *   • avatar stack + Invite button
- *   • PipelineStrip showing the 5-team handoff state
  *   • Upload-part + share / settings buttons
  *
  * No data fetching here — purely presentational. The parent page owns the
@@ -16,7 +15,6 @@
 
 import { Plus, Settings, Share2, UserPlus } from 'lucide-react'
 import { AvatarStack } from '@/components/workspace/Avatar'
-import PipelineStrip from '@/components/workspace/PipelineStrip'
 import ProjectThumbnail from '@/components/workspace/ProjectThumbnail'
 import type { MockProject, ProjectStatus } from '@/lib/mockWorkspace'
 
@@ -103,16 +101,6 @@ export default function ProjectHubHero({
               accent={project.open_comments > 0 ? 'text-rose-600' : undefined}
             />
             <Stat label="Members" value={memberCount} />
-          </div>
-
-          {/* Pipeline + actions */}
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Pipeline
-              </p>
-              <PipelineStrip pipeline={project.pipeline} compact />
-            </div>
           </div>
 
           {/* Members + CTAs */}

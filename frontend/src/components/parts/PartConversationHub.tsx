@@ -39,6 +39,7 @@ import {
 import { ApiError, api } from '@/lib/api'
 import type { SummarizeThreadResponse } from '@/types/api'
 import DecisionsPanel from '@/components/decisions/DecisionsPanel'
+import CommentsPanel from '@/features/comments/components/CommentsPanel'
 import RedactedDecisionCard from '@/components/redaction/RedactedDecisionCard'
 import DatumRedactionExplainer from '@/components/redaction/DatumRedactionExplainer'
 import IssueTagChip from '@/components/feedback/IssueTagChip'
@@ -85,6 +86,9 @@ interface Props {
 
   // Redaction reason resolver — owned by the page (same regex as Day 5)
   reasonFor: (d: DecisionRead) => 'internal-flag' | 'cost-keyword' | 'admin-only-thread' | null
+
+  // v2 commenting (CommentsPanel) — user identity for thread authorship.
+  currentUser: { id: string; name: string }
 }
 
 export default function PartConversationHub({
@@ -104,6 +108,7 @@ export default function PartConversationHub({
   hiddenCommentsCount,
   screenSignal,
   reasonFor,
+  currentUser,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<HubTab>('comments')
 
@@ -229,11 +234,13 @@ export default function PartConversationHub({
       {/* ── Tab content (no page hop, just swap body) ────────────────── */}
       <div className="flex-1 px-2 py-2">
         {tab === 'comments' && (
-          <DecisionsPanel
-            decisions={visibleForComments}
-            onChanged={onDecisionChanged}
-            highlightedFaceUuid={highlightedFaceUuid}
-            onHoverDecision={onHoverDecision}
+          // v2 threaded comments — replaces inline DecisionsPanel.
+          // Drawer mounts via portal so it floats over the viewer.
+          <CommentsPanel
+            partId={partId}
+            partName={partName}
+            currentUser={currentUser}
+            composeAnchor={null}
           />
         )}
         {tab === 'issues' && <IssuesTabBody partId={partId} rows={issueRows} />}

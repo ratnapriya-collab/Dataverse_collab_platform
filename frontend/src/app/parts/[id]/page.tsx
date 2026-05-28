@@ -571,6 +571,7 @@ export default function PartPage() {
             hiddenCommentsCount={hiddenCommentsCount}
             screenSignal={screenSignal}
             reasonFor={redactionReason}
+            currentUser={{ id: user.id, name: user.name }}
           />
         )}
 

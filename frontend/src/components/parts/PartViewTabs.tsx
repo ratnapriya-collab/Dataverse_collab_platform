@@ -10,9 +10,9 @@
  */
 
 import Link from 'next/link'
-import { Box, FileText, Layers, ListTree } from 'lucide-react'
+import { Box, FileEdit, FileText, Layers, ListTree } from 'lucide-react'
 
-export type PartView = '3d' | '2d' | 'bom'
+export type PartView = '3d' | '2d' | 'bom' | 'doc'
 
 interface Props {
   partId: string
@@ -50,6 +50,13 @@ const TABS: TabSpec[] = [
     href: (id) => `/parts/${id}/bom`,
     icon: ListTree,
     hint: 'Assembly tree',
+  },
+  {
+    id: 'doc',
+    label: 'Doc',
+    href: (id) => `/parts/${id}/doc`,
+    icon: FileEdit,
+    hint: 'Design notes & spec',
   },
 ]
 

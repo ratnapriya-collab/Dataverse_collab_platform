@@ -1,0 +1,557 @@
+'use client'
+
+/**
+ * DocEditor — Google-Docs-style rich-text editor scoped to a part.
+ *
+ * Implementation uses contentEditable + document.execCommand (the lowest-
+ * dependency way to ship a real editor without pulling in Tiptap / Lexical /
+ * Slate). execCommand is deprecated but works in every current browser and
+ * is fine for a mock workspace.
+ *
+ * Per-part autosave to localStorage under `dataverse.doc.<partId>.<tabId>`.
+ *
+ * Supports the toolbar slice that matters for engineering design notes:
+ *   · Undo / Redo · Print
+ *   · Heading style (Normal · Title · Heading 1/2/3)
+ *   · Font family · Font size +/-
+ *   · Bold · Italic · Underline · Strikethrough
+ *   · Text color · Highlight color
+ *   · Insert link · Insert image (data-URL via FileReader)
+ *   · Align left/center/right/justify
+ *   · Bulleted · Numbered · Checklist (uses ul.checklist CSS)
+ *   · Decrease/Increase indent
+ *   · Clear formatting
+ *
+ * Left rail carries "Document tabs" (Tab 1, Tab 2) and template chips above
+ * the cursor row mirror the Google Docs blank-doc affordance.
+ */
+
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  ChevronDown,
+  Eraser,
+  FileText,
+  Highlighter,
+  Image as ImageIcon,
+  IndentDecrease,
+  IndentIncrease,
+  Italic,
+  Link2,
+  List,
+  ListChecks,
+  ListOrdered,
+  Mail,
+  Minus,
+  MoreHorizontal,
+  Plus,
+  Printer,
+  Redo2,
+  Sparkles,
+  Strikethrough,
+  Type,
+  Underline,
+  Undo2,
+} from 'lucide-react'
+
+interface DocTab {
+  id: string
+  name: string
+}
+
+interface Props {
+  partId: string
+  partName: string
+}
+
+const DEFAULT_TABS: DocTab[] = [
+  { id: 'tab1', name: 'Tab 1' },
+  { id: 'tab2', name: 'Tab 2' },
+]
+
+const FONT_FAMILIES = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Inter']
+const TEXT_STYLES: Array<{ id: string; label: string; block: string; sample: string }> = [
+  { id: 'normal', label: 'Normal text', block: 'p', sample: 'Aa' },
+  { id: 'title', label: 'Title', block: 'h1', sample: 'A' },
+  { id: 'subtitle', label: 'Subtitle', block: 'h2', sample: 'A' },
+  { id: 'h1', label: 'Heading 1', block: 'h2', sample: 'H1' },
+  { id: 'h2', label: 'Heading 2', block: 'h3', sample: 'H2' },
+  { id: 'h3', label: 'Heading 3', block: 'h4', sample: 'H3' },
+]
+
+const STORAGE_PREFIX = 'dataverse.doc.'
+
+function storageKey(partId: string, tabId: string): string {
+  return `${STORAGE_PREFIX}${partId}.${tabId}`
+}
+
+function readDoc(partId: string, tabId: string): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem(storageKey(partId, tabId)) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function writeDoc(partId: string, tabId: string, html: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(storageKey(partId, tabId), html)
+  } catch {
+    // localStorage may be unavailable — silent fail.
+  }
+}
+
+export default function DocEditor({ partId, partName }: Props): JSX.Element {
+  const fileInputId = useId()
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  const [tabs, setTabs] = useState<DocTab[]>(DEFAULT_TABS)
+  const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TABS[0]?.id ?? 'tab1')
+  const [fontFamily, setFontFamily] = useState('Arial')
+  const [fontSizePx, setFontSizePx] = useState(11)
+  const [textColor, setTextColor] = useState('#0f172a')
+  const [highlightColor, setHighlightColor] = useState('#fde68a')
+  const [showStyles, setShowStyles] = useState(false)
+  const [showFonts, setShowFonts] = useState(false)
+  const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // Restore content for the active tab.
+  useEffect(() => {
+    const node = editorRef.current
+    if (node === null) return
+    node.innerHTML = readDoc(partId, activeTabId)
+  }, [partId, activeTabId])
+
+  /** Run an execCommand and refocus the editor so the toolbar doesn't steal focus. */
+  const exec = useCallback((command: string, value?: string) => {
+    const node = editorRef.current
+    if (node === null) return
+    node.focus()
+    document.execCommand(command, false, value)
+    persist()
+  }, [])
+
+  /** Debounced-ish autosave — write current HTML to localStorage. */
+  const persist = useCallback(() => {
+    const node = editorRef.current
+    if (node === null) return
+    setSaving('saving')
+    writeDoc(partId, activeTabId, node.innerHTML)
+    // Tiny delay so the user sees "Saving…" briefly even though writes are sync.
+    window.setTimeout(() => setSaving('saved'), 220)
+  }, [partId, activeTabId])
+
+  /** Insert image as data URL — no upload, no backend, just file → base64. */
+  const handleImageInsert = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0]
+    if (file === undefined) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result
+      if (typeof dataUrl === 'string') exec('insertImage', dataUrl)
+    }
+    reader.readAsDataURL(file)
+    // Reset so the same file can be picked twice in a row.
+    e.target.value = ''
+  }
+
+  const handleLinkInsert = (): void => {
+    const url = window.prompt('Link URL')
+    if (url === null || url.trim() === '') return
+    exec('createLink', url.trim())
+  }
+
+  const handleFontSize = (delta: number): void => {
+    const next = Math.max(8, Math.min(72, fontSizePx + delta))
+    setFontSizePx(next)
+    // execCommand fontSize takes 1-7 — translate px to bucket. Crude but matches
+    // GDocs behaviour where the +/- buttons feel like steps.
+    const bucket = Math.max(1, Math.min(7, Math.round(((next - 8) / 64) * 6) + 1))
+    exec('fontSize', String(bucket))
+  }
+
+  const handleFontFamily = (family: string): void => {
+    setFontFamily(family)
+    setShowFonts(false)
+    exec('fontName', family)
+  }
+
+  const handleStyle = (block: string): void => {
+    setShowStyles(false)
+    exec('formatBlock', block)
+  }
+
+  const handlePrint = (): void => {
+    window.print()
+  }
+
+  const handleAddTab = (): void => {
+    const nextId = `tab${tabs.length + 1}`
+    setTabs((t) => [...t, { id: nextId, name: `Tab ${t.length + 1}` }])
+    setActiveTabId(nextId)
+  }
+
+  const memberSaving = useMemo(() => {
+    if (saving === 'saving') return 'Saving…'
+    if (saving === 'saved') return 'All changes saved'
+    return ' '
+  }, [saving])
+
+  return (
+    <div className="flex h-full flex-col bg-white">
+      {/* ── Menu bar (visual only — GDocs-style: File · Edit · …) ─────────── */}
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-3 py-1.5 text-[11px] text-slate-600">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-primary text-white">
+          <FileText className="h-3 w-3" />
+        </span>
+        <span className="truncate font-semibold text-slate-900">
+          {partName} — design notes
+        </span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-500" aria-live="polite">
+          {memberSaving}
+        </span>
+        <nav className="ml-auto flex items-center gap-3 text-slate-600" aria-label="Menu">
+          {['File', 'Edit', 'View', 'Insert', 'Format', 'Tools', 'Extensions', 'Help'].map((m) => (
+            <button key={m} type="button" className="hover:text-slate-900">
+              {m}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-3 py-1.5">
+        <ToolGroup>
+          <ToolBtn onClick={() => exec('undo')} label="Undo" icon={Undo2} />
+          <ToolBtn onClick={() => exec('redo')} label="Redo" icon={Redo2} />
+          <ToolBtn onClick={handlePrint} label="Print" icon={Printer} />
+        </ToolGroup>
+
+        <Separator />
+
+        {/* Text-style dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowStyles((o) => !o)}
+            className="inline-flex h-7 items-center gap-1 rounded px-2 text-[12px] font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Normal text
+            <ChevronDown className="h-3 w-3 text-slate-400" />
+          </button>
+          {showStyles && (
+            <div
+              role="menu"
+              className="dv-anim-pop absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+            >
+              {TEXT_STYLES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleStyle(s.block)}
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px] text-slate-700 transition hover:bg-slate-50"
+                >
+                  <span>{s.label}</span>
+                  <span className="font-mono text-[10px] text-slate-400">{s.sample}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Font family dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowFonts((o) => !o)}
+            className="inline-flex h-7 items-center gap-1 rounded px-2 text-[12px] text-slate-700 hover:bg-slate-100"
+          >
+            {fontFamily}
+            <ChevronDown className="h-3 w-3 text-slate-400" />
+          </button>
+          {showFonts && (
+            <div
+              role="menu"
+              className="dv-anim-pop absolute left-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+            >
+              {FONT_FAMILIES.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => handleFontFamily(f)}
+                  className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 transition hover:bg-slate-50"
+                  style={{ fontFamily: f }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Font size +/- */}
+        <div className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleFontSize(-1)}
+            aria-label="Decrease font size"
+            className="flex h-6 w-6 items-center justify-center text-slate-600 hover:bg-slate-100"
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          <span className="inline-flex h-6 min-w-[28px] items-center justify-center text-[11px] font-semibold text-slate-700">
+            {fontSizePx}
+          </span>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleFontSize(1)}
+            aria-label="Increase font size"
+            className="flex h-6 w-6 items-center justify-center text-slate-600 hover:bg-slate-100"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        </div>
+
+        <Separator />
+
+        <ToolGroup>
+          <ToolBtn onClick={() => exec('bold')} label="Bold" icon={Bold} />
+          <ToolBtn onClick={() => exec('italic')} label="Italic" icon={Italic} />
+          <ToolBtn onClick={() => exec('underline')} label="Underline" icon={Underline} />
+          <ToolBtn onClick={() => exec('strikeThrough')} label="Strikethrough" icon={Strikethrough} />
+        </ToolGroup>
+
+        <Separator />
+
+        {/* Text color */}
+        <label
+          className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded hover:bg-slate-100"
+          title="Text color"
+        >
+          <Type className="h-4 w-4" style={{ color: textColor }} />
+          <input
+            type="color"
+            value={textColor}
+            onChange={(e) => {
+              setTextColor(e.target.value)
+              exec('foreColor', e.target.value)
+            }}
+            className="absolute inset-0 opacity-0"
+          />
+        </label>
+
+        {/* Highlight color */}
+        <label
+          className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded hover:bg-slate-100"
+          title="Highlight color"
+        >
+          <Highlighter className="h-4 w-4 text-slate-700" />
+          <span
+            className="pointer-events-none absolute bottom-1 left-1 right-1 h-1 rounded-sm"
+            style={{ background: highlightColor }}
+          />
+          <input
+            type="color"
+            value={highlightColor}
+            onChange={(e) => {
+              setHighlightColor(e.target.value)
+              exec('hiliteColor', e.target.value)
+            }}
+            className="absolute inset-0 opacity-0"
+          />
+        </label>
+
+        <Separator />
+
+        <ToolGroup>
+          <ToolBtn onClick={handleLinkInsert} label="Insert link" icon={Link2} />
+          <label
+            htmlFor={fileInputId}
+            className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-slate-600 hover:bg-slate-100"
+            title="Insert image"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </label>
+          <input
+            id={fileInputId}
+            type="file"
+            accept="image/*"
+            onChange={handleImageInsert}
+            className="sr-only"
+          />
+        </ToolGroup>
+
+        <Separator />
+
+        <ToolGroup>
+          <ToolBtn onClick={() => exec('justifyLeft')} label="Align left" icon={AlignLeft} />
+          <ToolBtn onClick={() => exec('justifyCenter')} label="Align center" icon={AlignCenter} />
+          <ToolBtn onClick={() => exec('justifyRight')} label="Align right" icon={AlignRight} />
+          <ToolBtn onClick={() => exec('justifyFull')} label="Justify" icon={AlignJustify} />
+        </ToolGroup>
+
+        <Separator />
+
+        <ToolGroup>
+          <ToolBtn
+            onClick={() => {
+              const sel = window.getSelection()?.toString() ?? ''
+              exec('insertHTML', `<ul class="dv-doc-checklist"><li>${sel || 'Checklist item'}</li></ul>`)
+            }}
+            label="Checklist"
+            icon={ListChecks}
+          />
+          <ToolBtn onClick={() => exec('insertUnorderedList')} label="Bulleted list" icon={List} />
+          <ToolBtn onClick={() => exec('insertOrderedList')} label="Numbered list" icon={ListOrdered} />
+        </ToolGroup>
+
+        <Separator />
+
+        <ToolGroup>
+          <ToolBtn onClick={() => exec('outdent')} label="Decrease indent" icon={IndentDecrease} />
+          <ToolBtn onClick={() => exec('indent')} label="Increase indent" icon={IndentIncrease} />
+          <ToolBtn onClick={() => exec('removeFormat')} label="Clear formatting" icon={Eraser} />
+        </ToolGroup>
+      </div>
+
+      {/* ── Body: left tab rail + editor canvas ───────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Document tabs rail */}
+        <aside className="w-[200px] shrink-0 border-r border-slate-100 bg-slate-50/40 px-3 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              aria-label="Back"
+              className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+            >
+              <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+            </button>
+            <button
+              type="button"
+              onClick={handleAddTab}
+              aria-label="Add tab"
+              className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Document tabs
+          </p>
+          <ul className="mt-2 space-y-0.5">
+            {tabs.map((t) => {
+              const active = t.id === activeTabId
+              return (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTabId(t.id)}
+                    className={[
+                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition',
+                      active
+                        ? 'bg-primary-50 font-semibold text-primary'
+                        : 'text-slate-700 hover:bg-slate-100/70',
+                    ].join(' ')}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="flex-1 truncate text-left">{t.name}</span>
+                    {active && <MoreHorizontal className="h-3 w-3 text-slate-400" />}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </aside>
+
+        {/* Editor canvas */}
+        <div className="dv-thin-scroll flex-1 overflow-y-auto bg-slate-100 px-6 py-6">
+          {/* Template chips above the cursor — visual nudges */}
+          <div className="mx-auto mb-3 flex max-w-[850px] flex-wrap items-center gap-2">
+            <Chip icon={Sparkles}>Templates</Chip>
+            <Chip icon={FileText}>Meeting notes</Chip>
+            <Chip icon={Mail}>Email draft</Chip>
+            <Chip icon={MoreHorizontal}>More</Chip>
+          </div>
+
+          {/* The page itself */}
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={persist}
+            onMouseDown={(e) => {
+              // Stop the editor from losing focus on toolbar click sequences.
+              if ((e.target as HTMLElement).closest?.('[data-toolbar]') !== null) e.preventDefault()
+            }}
+            spellCheck
+            role="textbox"
+            aria-label="Document body"
+            className="dv-doc-canvas mx-auto min-h-[1100px] max-w-[850px] rounded-sm bg-white px-[96px] py-[96px] text-[13px] leading-7 text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.06)] outline-none focus:shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+            style={{ fontFamily }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Small helpers ────────────────────────────────────────────────────────
+
+function ToolGroup({ children }: { children: React.ReactNode }): JSX.Element {
+  return (
+    <div data-toolbar className="inline-flex items-center gap-0.5">
+      {children}
+    </div>
+  )
+}
+
+function ToolBtn({
+  onClick,
+  label,
+  icon: Icon,
+}: {
+  onClick: () => void
+  label: string
+  icon: typeof Bold
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-700 transition hover:bg-slate-100"
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  )
+}
+
+function Separator(): JSX.Element {
+  return <span className="mx-1 inline-block h-5 w-px bg-slate-200" aria-hidden="true" />
+}
+
+function Chip({ icon: Icon, children }: { icon: typeof Sparkles; children: React.ReactNode }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+    >
+      <Icon className="h-3 w-3 text-slate-500" />
+      {children}
+    </button>
+  )
+}

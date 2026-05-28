@@ -469,27 +469,10 @@ export default function PartPage() {
   return (
     <main className="flex h-screen flex-col">
       <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
-          <div className="flex min-w-0 items-center gap-4">
-            <Link
-              href="/home"
-              aria-label="Back to home"
-              title="Back to home"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary hover:shadow-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <Logo compact markClassName="h-8 w-8" />
-            <div className="min-w-0 border-l border-slate-200 pl-4">
-              <h1 className="truncate text-sm font-semibold text-slate-900">
-                {part.name}
-              </h1>
-              <p className="truncate text-xs text-slate-500">
-                {part.file_name} · {part.content_hash.slice(0, 12)}…
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {/* Panel toggle — first thing on the left so the user can free up
+                viewer space without traveling across the header. */}
             <button
               type="button"
               onClick={() => setRightRailCollapsed((c) => !c)}
@@ -497,7 +480,7 @@ export default function PartPage() {
               aria-pressed={rightRailCollapsed}
               title={rightRailCollapsed ? 'Show conversation panel' : 'Hide conversation panel (more space for the 3D viewer)'}
               className={[
-                'inline-flex h-8 w-8 items-center justify-center rounded-md border transition',
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition',
                 rightRailCollapsed
                   ? 'border-primary/30 bg-primary-50 text-primary hover:bg-primary-100'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900',
@@ -509,13 +492,38 @@ export default function PartPage() {
                 <PanelLeftClose className="h-4 w-4" />
               )}
             </button>
+            <Link
+              href="/home"
+              aria-label="Back to home"
+              title="Back to home"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary hover:shadow-sm"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Link>
+            <Logo compact markClassName="h-7 w-7" />
+            <div className="min-w-0 border-l border-slate-200 pl-3">
+              <h1 className="truncate text-[13px] font-semibold leading-tight text-slate-900">
+                {part.name}
+              </h1>
+              <p className="truncate text-[10.5px] text-slate-500">
+                {part.file_name} · {part.content_hash.slice(0, 12)}…
+              </p>
+            </div>
+            <span className="hidden h-5 w-px shrink-0 bg-slate-200 sm:inline-block" aria-hidden="true" />
+            <PartViewTabs
+              partId={partId ?? ''}
+              active="3d"
+              contextChip={`${labels.length} pins · ${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}`}
+            />
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             <RoleSwitcher active={activeRole} />
             <span className="hidden h-5 w-px bg-slate-200 sm:inline-block" aria-hidden="true" />
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"
               onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
+              className="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-slate-900"
             >
               Sign out
             </button>
@@ -535,12 +543,6 @@ export default function PartPage() {
           partPath={`/parts/${partId ?? ''}`}
         />
       )}
-
-      <PartViewTabs
-        partId={partId ?? ''}
-        active="3d"
-        contextChip={`${labels.length} pins · ${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}`}
-      />
 
       <section
         className={[

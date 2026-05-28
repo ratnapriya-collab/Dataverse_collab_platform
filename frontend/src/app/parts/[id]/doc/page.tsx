@@ -87,35 +87,35 @@ export default function PartDocPage(): JSX.Element {
   return (
     <main className="flex h-screen flex-col">
       <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
-          <div className="flex min-w-0 items-center gap-4">
+        <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Link
               href={`/parts/${partId}`}
               aria-label="Back to 3D viewer"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary hover:shadow-sm"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary hover:shadow-sm"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
-            <Logo compact markClassName="h-8 w-8" />
-            <div className="min-w-0 border-l border-slate-200 pl-4">
-              <h1 className="truncate text-sm font-semibold text-slate-900">{partName}</h1>
-              <p className="truncate text-xs text-slate-500">Design notes · autosaved locally</p>
+            <Logo compact markClassName="h-7 w-7" />
+            <div className="min-w-0 border-l border-slate-200 pl-3">
+              <h1 className="truncate text-[13px] font-semibold leading-tight text-slate-900">{partName}</h1>
+              <p className="truncate text-[10.5px] text-slate-500">Design notes · autosaved locally</p>
             </div>
+            <span className="hidden h-5 w-px shrink-0 bg-slate-200 sm:inline-block" aria-hidden="true" />
+            <PartViewTabs partId={partId} active="doc" />
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             <UserBadge name={user.name} email={user.email} />
             <button
               type="button"
               onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
+              className="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-slate-900"
             >
               Sign out
             </button>
           </div>
         </div>
       </header>
-
-      <PartViewTabs partId={partId} active="doc" />
 
       <section className="flex flex-1 overflow-hidden">
         <DocEditor partId={partId} partName={partName} />

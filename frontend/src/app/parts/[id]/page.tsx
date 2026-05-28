@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import CreateDecisionModal from '@/components/decisions/CreateDecisionModal'
@@ -504,9 +504,9 @@ export default function PartPage() {
               ].join(' ')}
             >
               {rightRailCollapsed ? (
-                <PanelRightOpen className="h-4 w-4" />
+                <PanelLeftOpen className="h-4 w-4" />
               ) : (
-                <PanelRightClose className="h-4 w-4" />
+                <PanelLeftClose className="h-4 w-4" />
               )}
             </button>
             <RoleSwitcher active={activeRole} />
@@ -545,20 +545,10 @@ export default function PartPage() {
       <section
         className={[
           'grid flex-1 overflow-hidden transition-[grid-template-columns] duration-200',
-          rightRailCollapsed ? 'grid-cols-[1fr]' : 'grid-cols-[1fr_360px]',
+          rightRailCollapsed ? 'grid-cols-[1fr]' : 'grid-cols-[360px_1fr]',
         ].join(' ')}
       >
-        <div className="relative bg-slate-100">
-          <ViewerCanvas
-            onFacePick={handleFacePick}
-            partUrl={fileUrl}
-            partExt={ext}
-            labels={labels}
-            onLabelClick={setHoveredFaceUuid}
-          />
-        </div>
-
-        {/* Right rail — Part conversation hub (compact, tabbed).
+        {/* Left rail — Part conversation hub (compact, tabbed).
             Fully hidden when collapsed → the 3D viewer takes the full width.
             The toggle button lives in the page header (top-right). */}
         {!rightRailCollapsed && (
@@ -581,6 +571,16 @@ export default function PartPage() {
             reasonFor={redactionReason}
           />
         )}
+
+        <div className="relative bg-slate-100">
+          <ViewerCanvas
+            onFacePick={handleFacePick}
+            partUrl={fileUrl}
+            partExt={ext}
+            labels={labels}
+            onLabelClick={setHoveredFaceUuid}
+          />
+        </div>
 
         {/* STEP-stub notice was moved into the hub footer once partner mode
             is off — surface only when relevant. Inline here for now so we

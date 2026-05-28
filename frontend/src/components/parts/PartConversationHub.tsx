@@ -145,7 +145,7 @@ export default function PartConversationHub({
   const visibleForComments = isPartner ? visibleDecisions : decisions
 
   return (
-    <aside className="dv-thin-scroll flex h-full flex-col overflow-y-auto border-l border-slate-200 bg-white">
+    <aside className="dv-thin-scroll flex h-full flex-col overflow-y-auto border-r border-slate-200 bg-white">
       {/* ── Compact part header ─────────────────────────────────────── */}
       <header className="border-b border-slate-100 bg-slate-50/60 px-3 py-2.5">
         <div className="flex items-center gap-1.5">

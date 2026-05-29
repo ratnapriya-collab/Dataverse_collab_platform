@@ -111,11 +111,17 @@ export default function ExportDialog({
         onClick={busy ? undefined : closeExportDialog}
         aria-hidden="true"
       />
+      {/* Centering wrapper — uses flex instead of transform so the dialog's
+          own dv-anim-pop animation doesn't cancel out the centering. */}
+      <div
+        className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+        aria-hidden="true"
+      >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Export comments to PDF"
-        className="dv-anim-pop fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+        className="dv-anim-pop pointer-events-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-3">
           <div className="flex items-center gap-2">
@@ -245,6 +251,7 @@ export default function ExportDialog({
             )}
           </button>
         </footer>
+      </div>
       </div>
     </>,
     document.body,

@@ -18,6 +18,7 @@ from app.routes import auth as auth_routes
 from app.routes import datum as datum_routes
 from app.routes import decisions as decisions_routes
 from app.routes import parts as parts_routes
+from app.routes import threads as threads_routes
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,8 @@ def create_app() -> FastAPI:
     app.include_router(anchors_routes.router, prefix="/api/anchors", tags=["anchors"])
     app.include_router(decisions_routes.router, prefix="/api/decisions", tags=["decisions"])
     app.include_router(datum_routes.router, prefix="/api/datum", tags=["datum"])
+    # Mounted at /api so threads.py's paths read /api/threads, /api/replies/...
+    app.include_router(threads_routes.router, prefix="/api", tags=["threads"])
 
     @app.get("/health")
     def health() -> dict[str, object]:

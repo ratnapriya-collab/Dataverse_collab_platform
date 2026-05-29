@@ -115,8 +115,15 @@ function buildMockDecisions(partId: string): DecisionRead[] {
     const state: DecisionState =
       d.state === 'DRAFT' ? 'DRAFT' : (d.state as DecisionState)
     const author = memberById.get(d.author_name)
-    // Spread anchor centroids over a small grid so pins don't stack.
-    const centroid = { x: -1 + (i % 3) * 0.8, y: ((i % 2) - 0.5) * 0.6, z: 0.5 }
+    // Spread anchor centroids across the sample geometry (cylinder · sphere
+    // · cube) using a deterministic pseudo-random so 15+ pins don't stack.
+    // Hash the index with three coprime primes → reproducible-but-varied XYZ.
+    const seed = (i + 1) * 31
+    const centroid = {
+      x: -2.4 + ((seed * 73) % 100) / 20,       // -2.4 → +2.6
+      y: -0.9 + ((seed * 47) % 100) / 55,       // -0.9 → +0.9
+      z: 0.1 + ((seed * 19) % 100) / 60,        //  0.1 → +1.8
+    }
     return {
       id: d.id,
       part_id: partId,

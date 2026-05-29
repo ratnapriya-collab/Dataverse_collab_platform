@@ -205,7 +205,6 @@ export default function CommentLabels({
 }: Props) {
   const scene = useViewerStore((s) => s.babylonScene)
   const labelRefs = useRef<Map<string, HTMLElement>>(new Map())
-  const lineRefs = useRef<Map<string, SVGLineElement>>(new Map())
   const pinRefs = useRef<Map<string, SVGGElement>>(new Map())
 
   // Tag-picker UI state — which card's picker is open, and who's tagged where.
@@ -258,27 +257,21 @@ export default function CommentLabels({
       for (const marker of labels) {
         const proj = projectAnchor(scene, marker.centroid)
         const labelEl = labelRefs.current.get(marker.faceUuid)
-        const lineEl = lineRefs.current.get(marker.faceUuid)
         const pinEl = pinRefs.current.get(marker.faceUuid)
         if (proj === null || proj.behind) {
           if (labelEl) labelEl.style.opacity = '0'
-          if (lineEl) lineEl.style.opacity = '0'
           if (pinEl) pinEl.style.opacity = '0'
           continue
         }
+        // Card attaches directly next to the pin (no leader line). Offset
+        // is small + deterministic per face_uuid so two near pins don't
+        // stack their cards exactly on top of each other.
         const { dx, dy } = offsetFor(marker.faceUuid)
-        const labelX = proj.x + dx
-        const labelY = proj.y + dy
+        const labelX = proj.x + Math.sign(dx) * 18  // shorter offset — sit right next to the pin
+        const labelY = proj.y + Math.sign(dy) * 4
         if (labelEl) {
           labelEl.style.opacity = '1'
           labelEl.style.transform = `translate3d(${labelX}px, ${labelY}px, 0) translate(${dx >= 0 ? '0' : '-100%'}, -50%)`
-        }
-        if (lineEl) {
-          lineEl.style.opacity = '1'
-          lineEl.setAttribute('x1', String(labelX))
-          lineEl.setAttribute('y1', String(labelY))
-          lineEl.setAttribute('x2', String(proj.x))
-          lineEl.setAttribute('y2', String(proj.y))
         }
         if (pinEl) {
           pinEl.style.opacity = '1'
@@ -292,7 +285,10 @@ export default function CommentLabels({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
-      {/* SVG layer: leader lines + round "+" pins */}
+      {/* SVG layer: round "+" pins only.
+          Leader lines were removed per v2 design — the card attaches
+          directly next to its pin so the viewer reads as a uniform pin
+          field, not a tangle of dashed connectors. */}
       <svg
         className="absolute inset-0 h-full w-full overflow-visible"
         aria-hidden="true"
@@ -310,23 +306,6 @@ export default function CommentLabels({
             </feMerge>
           </filter>
         </defs>
-
-        {/* Leader lines */}
-        {labels.map((m) => (
-          <line
-            key={`line-${m.faceUuid}`}
-            ref={(el) => {
-              if (el !== null) lineRefs.current.set(m.faceUuid, el)
-              else lineRefs.current.delete(m.faceUuid)
-            }}
-            stroke={TONE_HEX[m.tone]}
-            strokeWidth={1}
-            strokeDasharray="3 3"
-            strokeLinecap="round"
-            opacity={0.6}
-            style={{ opacity: 0 }}
-          />
-        ))}
 
         {/* Round "+" pins — uniform teal, CoLab-style */}
         {labels.map((m) => (

@@ -115,9 +115,9 @@ export default function ExportDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Export comments to PDF"
-        className="dv-anim-pop fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+        className="dv-anim-pop fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
       >
-        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-3">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-bold text-slate-900">Export comments</h2>
@@ -133,7 +133,7 @@ export default function ExportDialog({
           </button>
         </header>
 
-        <div className="space-y-3.5 px-5 py-4 text-sm">
+        <div className="dv-thin-scroll flex-1 space-y-3.5 overflow-y-auto px-5 py-4 text-sm">
           {/* Scope */}
           <div>
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -217,7 +217,7 @@ export default function ExportDialog({
           )}
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
           <button
             type="button"
             onClick={closeExportDialog}

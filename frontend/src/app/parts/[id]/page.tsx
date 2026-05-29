@@ -12,6 +12,8 @@ import RoleSwitcher, { type ViewRole } from '@/components/redaction/RoleSwitcher
 import PartnerViewBanner from '@/components/redaction/PartnerViewBanner'
 import PartViewTabs from '@/components/parts/PartViewTabs'
 import PartConversationHub from '@/components/parts/PartConversationHub'
+import { useCommentsStore } from '@/features/comments/store/commentsStore'
+import { useThreads as useV2Threads } from '@/features/comments/hooks/useThreadsStorage'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_FULL_DECISIONS, SEED_MEMBERS } from '@/lib/mockWorkspace'
@@ -194,6 +196,30 @@ export default function PartPage() {
   // Right rail (conversation hub) collapse state — gives the 3D viewer the
   // full width when the user wants to focus on geometry without distractions.
   const [rightRailCollapsed, setRightRailCollapsed] = useState(false)
+
+  // Smart-pin visibility (v2): the floating annotation card in the viewer
+  // only shows when the user clicks a comment in the panel OR clicks the
+  // matching pin on the model. Pins are always visible; the expensive card
+  // chrome stays collapsed until summoned. Click anywhere else clears.
+  const [selectedFaceUuid, setSelectedFaceUuid] = useState<string | null>(null)
+  // Toggle: if you click the same face twice, the card closes.
+  const handleSelectFace = useCallback((faceUuid: string | null) => {
+    setSelectedFaceUuid((prev) => (prev === faceUuid ? null : faceUuid))
+  }, [])
+
+  // Bridge: when the v2 CommentsPanel selects a thread, derive its faceUuid
+  // and drive the floating-card visibility on the viewer. One state, two
+  // surfaces — sidebar + viewer stay locked in sync.
+  const selectedThreadId = useCommentsStore((s) => s.selectedThreadId)
+  const { threads: v2Threads } = useV2Threads(partId ?? '')
+  useEffect(() => {
+    if (selectedThreadId === null) {
+      setSelectedFaceUuid(null)
+      return
+    }
+    const thread = v2Threads.find((t) => t.id === selectedThreadId)
+    if (thread !== undefined) setSelectedFaceUuid(thread.anchor.faceUuid)
+  }, [selectedThreadId, v2Threads])
 
   // Face-pick & modal flow.
   //
@@ -575,13 +601,25 @@ export default function PartPage() {
           />
         )}
 
-        <div className="relative bg-slate-100">
+        <div className="relative bg-slate-100" onClick={(e) => {
+          // Click on empty viewer area (not a pin / not a card) closes the card.
+          const target = e.target as HTMLElement
+          if (target.closest?.('[data-comment-card]') !== null) return
+          if (target.closest?.('[data-pin]') !== null) return
+          // The pin itself handles its own selection via onLabelClick.
+        }}>
           <ViewerCanvas
             onFacePick={handleFacePick}
             partUrl={fileUrl}
             partExt={ext}
             labels={labels}
-            onLabelClick={setHoveredFaceUuid}
+            // Pin click selects; same-pin re-click closes the card.
+            onLabelClick={(faceUuid) => {
+              setHoveredFaceUuid(faceUuid)
+              handleSelectFace(faceUuid)
+            }}
+            cardVisibility="selected-only"
+            visibleCardFor={selectedFaceUuid}
           />
         </div>
 

@@ -45,6 +45,9 @@ interface Props {
   labels?: LabeledMarker[]
   /** Optional click handler for a comment label (e.g. scroll to that card). */
   onLabelClick?: (faceUuid: string) => void
+  /** Smart-pin visibility — v2 commenting. */
+  cardVisibility?: 'always' | 'selected-only'
+  visibleCardFor?: string | null
 }
 
 // next/dynamic with ssr:false guarantees the viewer never renders on the server.
@@ -70,6 +73,8 @@ export default function ViewerCanvas({
   partExt,
   labels,
   onLabelClick,
+  cardVisibility,
+  visibleCardFor,
 }: Props) {
   // Mirrors the viewer's local UI state — the viewer needs at least an empty
   // array so its sidebar/right-panel toggling logic doesn't crash.
@@ -115,7 +120,12 @@ export default function ViewerCanvas({
         loadExt={partExt}
       />
       {labels !== undefined && labels.length > 0 && (
-        <CommentLabels labels={labels} onClick={onLabelClick} />
+        <CommentLabels
+          labels={labels}
+          onClick={onLabelClick}
+          cardVisibility={cardVisibility}
+          visibleCardFor={visibleCardFor}
+        />
       )}
     </div>
   )

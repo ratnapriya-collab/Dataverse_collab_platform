@@ -9,6 +9,8 @@ interface Props {
   onChanged: (updated: DecisionRead) => void
   highlightedFaceUuid: string | null
   onHoverDecision: (faceUuid: string | null) => void
+  /** Smart-pin v2: clicking a comment opens its floating card on the viewer. */
+  onSelectFace?: (faceUuid: string | null) => void
 }
 
 export default function DecisionsPanel({
@@ -16,6 +18,7 @@ export default function DecisionsPanel({
   onChanged,
   highlightedFaceUuid,
   onHoverDecision,
+  onSelectFace,
 }: Props) {
   const proposed = decisions.filter((d) => d.state === 'PROPOSED').length
   const accepted = decisions.filter((d) => d.state === 'ACCEPTED').length
@@ -62,6 +65,7 @@ export default function DecisionsPanel({
                 decision={d}
                 onChanged={onChanged}
                 onHover={onHoverDecision}
+                onSelectFace={onSelectFace}
                 highlighted={
                   d.anchor !== null && d.anchor.face_uuid === highlightedFaceUuid
                 }

@@ -174,9 +174,24 @@ const PIN_RING = '#1f7a6d'
 interface Props {
   labels: LabeledMarker[]
   onClick?: (faceUuid: string) => void
+  /**
+   * Smart-pin visibility (v2):
+   *   · 'always' — every label renders its card (legacy behaviour)
+   *   · 'selected-only' — pins always render; the floating card renders
+   *     ONLY for `visibleCardFor`. Other cards stay collapsed.
+   * Defaults to 'always' so existing call sites don't change.
+   */
+  cardVisibility?: 'always' | 'selected-only'
+  /** When cardVisibility === 'selected-only', the single face_uuid whose card is shown. */
+  visibleCardFor?: string | null
 }
 
-export default function CommentLabels({ labels, onClick }: Props) {
+export default function CommentLabels({
+  labels,
+  onClick,
+  cardVisibility = 'always',
+  visibleCardFor = null,
+}: Props) {
   const scene = useViewerStore((s) => s.babylonScene)
   const labelRefs = useRef<Map<string, HTMLElement>>(new Map())
   const lineRefs = useRef<Map<string, SVGLineElement>>(new Map())
@@ -323,8 +338,13 @@ export default function CommentLabels({ labels, onClick }: Props) {
         ))}
       </svg>
 
-      {/* HTML annotation cards — positioned per-frame via direct DOM writes */}
+      {/* HTML annotation cards — positioned per-frame via direct DOM writes.
+          Smart-pin visibility: in 'selected-only' mode, only the card whose
+          face_uuid === visibleCardFor renders. All pins stay visible above. */}
       {labels.map((m) => {
+        if (cardVisibility === 'selected-only' && m.faceUuid !== visibleCardFor) {
+          return null
+        }
         const author = m.authorName ?? 'You'
         const statePill = STATE_PILL_TONE[m.tone]
         const stateText = m.headerLabel ?? TONE_LABEL[m.tone]

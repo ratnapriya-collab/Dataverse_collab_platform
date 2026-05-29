@@ -10,6 +10,8 @@ interface Props {
   onChanged: (updated: DecisionRead) => void
   highlighted?: boolean
   onHover?: (faceUuid: string | null) => void
+  /** Smart-pin v2: click the card → toggle the floating card on the viewer. */
+  onSelectFace?: (faceUuid: string | null) => void
 }
 
 const STATE_STYLES: Record<DecisionState, { bg: string; text: string; label: string }> = {
@@ -25,6 +27,7 @@ export default function DecisionCard({
   onChanged,
   highlighted = false,
   onHover,
+  onSelectFace,
 }: Props) {
   const [busy, setBusy] = useState<DecisionState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -55,10 +58,13 @@ export default function DecisionCard({
     <article
       onMouseEnter={() => onHover?.(decision.anchor?.face_uuid ?? null)}
       onMouseLeave={() => onHover?.(null)}
+      onClick={() => onSelectFace?.(decision.anchor?.face_uuid ?? null)}
       className={[
-        'rounded-lg border bg-white px-3 py-2.5 transition',
-        highlighted ? 'border-primary shadow-md ring-1 ring-primary/30' : 'border-slate-200',
+        'cursor-pointer rounded-lg border bg-white px-3 py-2.5 transition',
+        highlighted ? 'border-primary shadow-md ring-1 ring-primary/30' : 'border-slate-200 hover:border-slate-300',
       ].join(' ')}
+      role="button"
+      tabIndex={0}
     >
       <div className="flex items-start justify-between gap-2">
         <span

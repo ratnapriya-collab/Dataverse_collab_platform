@@ -71,6 +71,8 @@ interface Props {
   onDecisionChanged: (d: DecisionRead) => void
   highlightedFaceUuid: string | null
   onHoverDecision: (faceUuid: string | null) => void
+  /** Smart-pin v2: click a comment → toggle that pin's floating card on the viewer. */
+  onSelectFace?: (faceUuid: string | null) => void
 
   // Partner-view state (driven by parent)
   isPartner: boolean
@@ -103,6 +105,7 @@ export default function PartConversationHub({
   onDecisionChanged,
   highlightedFaceUuid,
   onHoverDecision,
+  onSelectFace,
   isPartner,
   showWhatsHidden,
   hiddenCommentsCount,

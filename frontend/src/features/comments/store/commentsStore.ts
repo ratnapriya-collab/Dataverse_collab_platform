@@ -47,9 +47,19 @@ export interface CommentsState {
   selectedForExport: Set<string>
 
   // Actions
+  /**
+   * Two-step interaction model (v2.1):
+   *   step 1 — selectThread() shows the floating card on the viewer ONLY
+   *   step 2 — openDrawer() reveals the right-side thread drawer
+   * Sidebar click → step 1 · Viewer card/pin click → step 2.
+   * This avoids "click left, three panels open at once" overload.
+   */
   selectThread: (id: string | null, source: SelectionSource) => void
+  openDrawer: () => void
   setHovered: (id: string | null) => void
   closeDrawer: () => void
+  /** Close the drawer AND clear the selection (e.g. clicking empty viewer). */
+  clearAll: () => void
   setFilter: <K extends keyof ThreadFilters>(key: K, value: ThreadFilters[K]) => void
   resetFilters: () => void
   setSort: (sort: CommentsState['sort']) => void
@@ -85,14 +95,21 @@ export const useCommentsStore = create<CommentsState>()(
     exportDialogOpen: false,
     selectedForExport: new Set(),
 
+    // Step 1: shows the floating card on the viewer, drawer stays closed.
     selectThread: (id, source) =>
       set({
         selectedThreadId: id,
         selectionSource: source,
-        drawerOpen: id !== null,
+        // No drawer auto-open — that's step 2 via openDrawer().
       }),
+    // Step 2: open the right-side thread drawer. No-op if nothing selected.
+    openDrawer: () =>
+      set((s) => (s.selectedThreadId === null ? {} : { drawerOpen: true })),
     setHovered: (id) => set({ hoveredThreadId: id }),
-    closeDrawer: () =>
+    // Close just the drawer — selection (floating card) stays visible.
+    closeDrawer: () => set({ drawerOpen: false }),
+    // Fully reset — used by viewer empty-space clicks + the drawer's "X" button.
+    clearAll: () =>
       set({ drawerOpen: false, selectedThreadId: null, selectionSource: null }),
     setFilter: (key, value) =>
       set((s) => ({ filters: { ...s.filters, [key]: value } })),

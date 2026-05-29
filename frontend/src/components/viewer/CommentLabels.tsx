@@ -173,7 +173,17 @@ const PIN_RING = '#1f7a6d'
 
 interface Props {
   labels: LabeledMarker[]
+  /**
+   * Pin click — fires when the small "+" marker is clicked. Use this for
+   * step-1 selection (show the floating card). Default behaviour.
+   */
   onClick?: (faceUuid: string) => void
+  /**
+   * Card click — fires when the floating annotation card itself is clicked.
+   * Use for step-2 (open the right-side thread drawer). If omitted, falls
+   * back to onClick.
+   */
+  onCardClick?: (faceUuid: string) => void
   /**
    * Smart-pin visibility (v2):
    *   · 'always' — every label renders its card (legacy behaviour)
@@ -189,6 +199,7 @@ interface Props {
 export default function CommentLabels({
   labels,
   onClick,
+  onCardClick,
   cardVisibility = 'always',
   visibleCardFor = null,
 }: Props) {
@@ -360,11 +371,16 @@ export default function CommentLabels({
             role="button"
             tabIndex={0}
             aria-label={`Decision by ${author}`}
-            onClick={() => onClick?.(m.faceUuid)}
+            onClick={(e) => {
+              e.stopPropagation()
+              const handler = onCardClick ?? onClick
+              handler?.(m.faceUuid)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                onClick?.(m.faceUuid)
+                const handler = onCardClick ?? onClick
+                handler?.(m.faceUuid)
               }
             }}
             className="pointer-events-auto absolute left-0 top-0 w-[300px] cursor-pointer overflow-visible rounded-2xl border border-slate-200 bg-white text-left shadow-xl ring-1 ring-black/5 transition hover:shadow-2xl"

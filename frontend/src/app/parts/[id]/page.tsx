@@ -601,22 +601,29 @@ export default function PartPage() {
           />
         )}
 
-        <div className="relative bg-slate-100" onClick={(e) => {
-          // Click on empty viewer area (not a pin / not a card) closes the card.
-          const target = e.target as HTMLElement
-          if (target.closest?.('[data-comment-card]') !== null) return
-          if (target.closest?.('[data-pin]') !== null) return
-          // The pin itself handles its own selection via onLabelClick.
-        }}>
+        <div className="relative bg-slate-100">
           <ViewerCanvas
             onFacePick={handleFacePick}
             partUrl={fileUrl}
             partExt={ext}
             labels={labels}
-            // Pin click selects; same-pin re-click closes the card.
+            // Step 1: clicking a pin toggles its floating card. Same pin
+            // twice closes the card.
             onLabelClick={(faceUuid) => {
               setHoveredFaceUuid(faceUuid)
               handleSelectFace(faceUuid)
+            }}
+            // Step 2: clicking the floating card opens the right-side
+            // thread drawer for that comment.
+            onCardClick={(faceUuid) => {
+              // Find the matching v2 thread by faceUuid; sync the store
+              // (in case the user reached the card via a pin click, not
+              // the left panel), then explicitly open the drawer.
+              const thread = v2Threads.find((t) => t.anchor.faceUuid === faceUuid)
+              if (thread !== undefined) {
+                useCommentsStore.getState().selectThread(thread.id, 'pin')
+                useCommentsStore.getState().openDrawer()
+              }
             }}
             cardVisibility="selected-only"
             visibleCardFor={selectedFaceUuid}

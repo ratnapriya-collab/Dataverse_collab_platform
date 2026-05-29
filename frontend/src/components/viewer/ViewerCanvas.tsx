@@ -45,6 +45,8 @@ interface Props {
   labels?: LabeledMarker[]
   /** Optional click handler for a comment label (e.g. scroll to that card). */
   onLabelClick?: (faceUuid: string) => void
+  /** Card click — fires step-2 (open thread drawer). */
+  onCardClick?: (faceUuid: string) => void
   /** Smart-pin visibility — v2 commenting. */
   cardVisibility?: 'always' | 'selected-only'
   visibleCardFor?: string | null
@@ -73,6 +75,7 @@ export default function ViewerCanvas({
   partExt,
   labels,
   onLabelClick,
+  onCardClick,
   cardVisibility,
   visibleCardFor,
 }: Props) {
@@ -123,6 +126,7 @@ export default function ViewerCanvas({
         <CommentLabels
           labels={labels}
           onClick={onLabelClick}
+          onCardClick={onCardClick}
           cardVisibility={cardVisibility}
           visibleCardFor={visibleCardFor}
         />

@@ -17,6 +17,8 @@ import type {
   RationaleSuggestion,
   ScreenBoundaryRequest,
   ScreenBoundaryResponse,
+  SummarizeDocumentRequest,
+  SummarizeDocumentResponse,
   SummarizeThreadRequest,
   SummarizeThreadResponse,
   TokenResponse,
@@ -232,6 +234,13 @@ export const api = {
     },
     screenBoundary(body: ScreenBoundaryRequest): Promise<ScreenBoundaryResponse> {
       return request<ScreenBoundaryResponse>('/api/datum/screen-boundary', {
+        method: 'POST',
+        body,
+        auth: true,
+      })
+    },
+    summarizeDocument(body: SummarizeDocumentRequest): Promise<SummarizeDocumentResponse> {
+      return request<SummarizeDocumentResponse>('/api/datum/summarize-document', {
         method: 'POST',
         body,
         auth: true,

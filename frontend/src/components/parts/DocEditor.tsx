@@ -32,7 +32,9 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
+  AlertTriangle,
   Bold,
+  CheckCircle2,
   ChevronDown,
   Eraser,
   FileText,
@@ -45,6 +47,7 @@ import {
   List,
   ListChecks,
   ListOrdered,
+  Loader2,
   Mail,
   Minus,
   MoreHorizontal,
@@ -56,7 +59,10 @@ import {
   Type,
   Underline,
   Undo2,
+  X,
 } from 'lucide-react'
+import { ApiError, api } from '@/lib/api'
+import type { SummarizeDocumentResponse } from '@/types/api'
 
 interface DocTab {
   id: string
@@ -119,6 +125,41 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
   const [showStyles, setShowStyles] = useState(false)
   const [showFonts, setShowFonts] = useState(false)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // Datum AI · Hook 6 · Summarize Document
+  const [datumOpen, setDatumOpen] = useState(false)
+  const [datumLoading, setDatumLoading] = useState(false)
+  const [datumError, setDatumError] = useState<string | null>(null)
+  const [datumResult, setDatumResult] = useState<SummarizeDocumentResponse | null>(null)
+
+  const handleSummarize = useCallback(async () => {
+    const node = editorRef.current
+    if (node === null) return
+    const bodyText = (node.innerText ?? '').trim()
+    setDatumOpen(true)
+    setDatumError(null)
+    setDatumResult(null)
+    setDatumLoading(true)
+    try {
+      const result = await api.datum.summarizeDocument({
+        document_id: `${partId}.${activeTabId}`,
+        document_title: `${partName} — design notes`,
+        body: bodyText,
+        part_name: partName,
+      })
+      setDatumResult(result)
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'timeout') {
+        setDatumError('Datum timed out — please try again.')
+      } else if (err instanceof ApiError && err.code === 'network_error') {
+        setDatumError('Datum is offline — restart the backend on :4000.')
+      } else {
+        setDatumError(err instanceof Error ? err.message : 'Datum is unavailable')
+      }
+    } finally {
+      setDatumLoading(false)
+    }
+  }, [partId, activeTabId, partName])
 
   // Restore content for the active tab.
   useEffect(() => {
@@ -424,6 +465,28 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
           <ToolBtn onClick={() => exec('indent')} label="Increase indent" icon={IndentIncrease} />
           <ToolBtn onClick={() => exec('removeFormat')} label="Clear formatting" icon={Eraser} />
         </ToolGroup>
+
+        {/* Datum AI · Hook 6 — pushed to the far right so it's discoverable
+            without being mashed in with the formatting tools. */}
+        <button
+          type="button"
+          onClick={handleSummarize}
+          disabled={datumLoading}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-violet-700 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm transition hover:from-violet-700 hover:to-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+          title="Summarise this document with Datum"
+        >
+          {datumLoading ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Reading…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3 w-3" />
+              Summarise with Datum
+            </>
+          )}
+        </button>
       </div>
 
       {/* ── Body: left tab rail + editor canvas ───────────────────────────── */}
@@ -502,8 +565,198 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
             style={{ fontFamily }}
           />
         </div>
+
+        {/* Datum AI panel — slides in from the right when the user asks
+            for a summary. Pinned to the editor area so it doesn't intrude
+            on the rest of the page. */}
+        {datumOpen && (
+          <DatumDocPanel
+            loading={datumLoading}
+            error={datumError}
+            result={datumResult}
+            onClose={() => setDatumOpen(false)}
+            onRetry={handleSummarize}
+          />
+        )}
       </div>
     </div>
+  )
+}
+
+// ── Datum AI · Document summary side panel ─────────────────────────────
+
+function DatumDocPanel({
+  loading,
+  error,
+  result,
+  onClose,
+  onRetry,
+}: {
+  loading: boolean
+  error: string | null
+  result: SummarizeDocumentResponse | null
+  onClose: () => void
+  onRetry: () => void
+}): JSX.Element {
+  const confidencePct =
+    result === null ? null : Math.round(result.confidence * 100)
+  const confidenceTone =
+    result === null
+      ? ''
+      : result.confidence >= 0.8
+        ? 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+        : result.confidence >= 0.6
+          ? 'bg-amber-100 text-amber-700 ring-amber-200'
+          : 'bg-rose-100 text-rose-700 ring-rose-200'
+
+  return (
+    <aside
+      className="dv-anim-fade-up dv-thin-scroll flex w-[360px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-gradient-to-br from-violet-50/60 via-white to-violet-50/30"
+      aria-label="Datum AI · document summary"
+    >
+      <header className="flex items-center gap-2 border-b border-violet-100 px-4 py-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-sm">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12.5px] font-bold text-violet-900">Datum</p>
+          <p className="text-[10px] uppercase tracking-wider text-violet-500">
+            Document summary
+          </p>
+        </div>
+        {result !== null && !result.declined && confidencePct !== null && (
+          <span
+            title={`Confidence: ${result.source}`}
+            className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ring-1 ${confidenceTone}`}
+          >
+            {confidencePct}%
+          </span>
+        )}
+        <button
+          type="button"
+          aria-label="Close summary"
+          onClick={onClose}
+          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </header>
+
+      <div className="flex-1 px-4 py-3">
+        {loading && (
+          <div className="flex items-center gap-2 text-[12px] text-violet-700">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Datum is reading the document…
+          </div>
+        )}
+
+        {error !== null && !loading && (
+          <div
+            role="alert"
+            className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700"
+          >
+            <p className="font-semibold">Datum couldn&apos;t summarise.</p>
+            <p className="mt-0.5">{error}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-1.5 rounded border border-rose-300 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-rose-700 transition hover:border-rose-400"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {result !== null && result.declined && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">
+            <p className="font-semibold">Datum declined to summarise.</p>
+            <p className="mt-0.5 text-[11px]">
+              {result.declined_reason ??
+                'Document body is too short to draft a confident summary.'}
+            </p>
+          </div>
+        )}
+
+        {result !== null && !result.declined && (
+          <div className="space-y-3 text-[12px]">
+            <p className="leading-relaxed text-slate-800">{result.summary}</p>
+
+            {result.key_points.length > 0 && (
+              <div>
+                <p className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">
+                  Key points
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {result.key_points.map((p) => (
+                    <li
+                      key={p}
+                      className="flex items-start gap-1.5 leading-snug text-slate-700"
+                    >
+                      <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0 text-amber-500" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {result.action_items.length > 0 && (
+              <div className="rounded-md border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                <p className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-emerald-700">
+                  <CheckCircle2 className="h-2.5 w-2.5" />
+                  Action items
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {result.action_items.map((a) => (
+                    <li
+                      key={a}
+                      className="flex items-start gap-1.5 leading-snug text-emerald-900"
+                    >
+                      <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-emerald-500" />
+                      <span>{a}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 border-t border-slate-100 pt-2 text-[9.5px] text-slate-500">
+              <span>
+                <span className="font-bold tabular-nums text-slate-700">
+                  {result.word_count_in}
+                </span>{' '}
+                words in
+              </span>
+              <span className="text-slate-300">→</span>
+              <span>
+                <span className="font-bold tabular-nums text-slate-700">
+                  {result.word_count_out}
+                </span>{' '}
+                words out
+              </span>
+              <span className="ml-auto font-mono">{result.source}</span>
+            </div>
+
+            <p className="border-t border-slate-100 pt-2 text-[9.5px] text-slate-400">
+              Datum drafted this —{' '}
+              <span className="font-semibold text-slate-500">
+                human always has the final word
+              </span>
+              .
+            </p>
+
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2.5 py-1 text-[10.5px] font-semibold text-violet-700 transition hover:border-violet-400"
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              Re-summarise
+            </button>
+          </div>
+        )}
+      </div>
+    </aside>
   )
 }
 

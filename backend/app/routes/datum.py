@@ -29,6 +29,8 @@ from app.schemas.decision import (
     RationaleSuggestRequest,
     ScreenBoundaryRequest,
     ScreenBoundaryResponse,
+    SummarizeDocumentRequest,
+    SummarizeDocumentResponse,
     SummarizeThreadRequest,
     SummarizeThreadResponse,
 )
@@ -351,5 +353,117 @@ def screen_boundary(
         latency_ms=latency_ms,
         source=response.source,
         declined=False,
+    )
+    return response
+
+
+# ── Hook 6: Summarize Document ─────────────────────────────────────────────
+
+
+# Templates keyed off length buckets — chooses a different "shape" of summary
+# so demos vary by document size. Phase 2 will swap for a real Ollama call
+# that streams the doc through llama3.1:8b.
+_DOC_SUMMARY_TEMPLATES = [
+    {
+        "summary": (
+            "{title} centres on the geometry, material spec, and tolerance "
+            "decisions for the {part_name} build. The author walks through "
+            "the as-designed values, calls out the open risks, and proposes "
+            "tightening three callouts before supplier release."
+        ),
+        "key_points": [
+            "Wall thickness minimum tightened from 1.6 mm → 2.0 mm per AS9100 §6.4.3",
+            "Surface roughness on the inlet flange held to Ra 1.6 µm for gasket sealing",
+            "Bolt-hole tolerance widened to ±0.1 mm to absorb supplier stack",
+            "Material spec: 6061-T6 confirmed by metallurgy review",
+        ],
+        "action_items": [
+            "Run FEA validation on the revised wall section by EOD Friday",
+            "Update drawing DRW-TURBO-V3-A2 with the new flange callout",
+            "Loop supplier into the tolerance discussion before sign-off",
+        ],
+        "confidence": 0.84,
+    },
+    {
+        "summary": (
+            "{title} is a design-review note covering the {part_name}. The "
+            "doc reads as a chronological log: starting from the CFD output, "
+            "moving through the tolerance stack, and closing on supplier "
+            "constraints. Two items remain unresolved."
+        ),
+        "key_points": [
+            "CFD shows 4.1 kPa pressure drop at peak flow — within target",
+            "Tolerance stack-up clears assembly with 0.05 mm margin",
+            "Supplier draft-angle minimum is 3° (current geometry: 1.5°)",
+        ],
+        "action_items": [
+            "Modify rib draft to 3° before re-quoting",
+            "Confirm cold-soak thermal behavior with one more FEA cycle",
+        ],
+        "confidence": 0.79,
+    },
+]
+
+
+@router.post("/summarize-document", response_model=SummarizeDocumentResponse)
+def summarize_document(
+    body: SummarizeDocumentRequest,
+    current: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SummarizeDocumentResponse:
+    """Hook 6 · Summarize Document (mocked).
+
+    Reads the doc body, picks a canned summary template, fills in the part
+    + title, and returns it. Length buckets choose different templates so a
+    short doc and a long doc don't feel identical in the demo.
+    """
+    started = time.perf_counter()
+
+    word_count_in = len(body.body.split())
+
+    if word_count_in < 5:
+        response = SummarizeDocumentResponse(
+            summary="There isn't enough content yet to summarise. Write a paragraph or two and try again.",
+            key_points=[],
+            action_items=[],
+            word_count_in=word_count_in,
+            word_count_out=0,
+            confidence=0.0,
+            source="mocked-fallback",
+            declined=True,
+            declined_reason="Document body has fewer than 5 words.",
+        )
+    else:
+        template = _DOC_SUMMARY_TEMPLATES[0] if word_count_in > 60 else _DOC_SUMMARY_TEMPLATES[1]
+        title = body.document_title or "This document"
+        part_name = body.part_name or "the current part"
+        summary_text = template["summary"].format(title=title, part_name=part_name)
+        response = SummarizeDocumentResponse(
+            summary=summary_text,
+            key_points=template["key_points"],
+            action_items=template["action_items"],
+            word_count_in=word_count_in,
+            word_count_out=len(summary_text.split()),
+            confidence=template["confidence"],
+            source="mocked-fallback",
+            declined=False,
+        )
+
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    _audit_datum_call(
+        session,
+        hook="summarize-document",
+        actor_id=current.id,
+        subject_id=body.document_id,
+        request_payload={
+            "document_id": body.document_id,
+            "document_title": body.document_title,
+            "word_count": word_count_in,
+        },
+        response_payload=response.model_dump(),
+        confidence=response.confidence,
+        latency_ms=latency_ms,
+        source=response.source,
+        declined=response.declined,
     )
     return response

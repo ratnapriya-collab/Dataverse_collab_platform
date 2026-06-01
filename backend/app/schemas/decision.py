@@ -179,3 +179,29 @@ class ScreenBoundaryResponse(BaseModel):
     redaction_reasons: dict[str, str]
     safe_summary: str | None = None
     source: str = "mocked-fallback"
+
+
+# ── Hook 6: Summarize Document ──────────────────────────────────────────────
+
+
+class SummarizeDocumentRequest(BaseModel):
+    """User asks Datum to summarise the current document body."""
+
+    document_id: str = Field(min_length=1)
+    document_title: str | None = None
+    body: str = Field(min_length=1)
+    part_name: str | None = None
+
+
+class SummarizeDocumentResponse(BaseModel):
+    """Datum's summary of an engineering doc — summary + key points + actions."""
+
+    summary: str = Field(min_length=20)
+    key_points: list[str]
+    action_items: list[str]
+    word_count_in: int
+    word_count_out: int
+    confidence: float = Field(ge=0.0, le=1.0)
+    source: str = "mocked-fallback"
+    declined: bool = False
+    declined_reason: str | None = None

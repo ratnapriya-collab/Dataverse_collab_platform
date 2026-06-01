@@ -183,3 +183,24 @@ export interface ScreenBoundaryResponse {
   safe_summary?: string | null
   source: 'llm' | 'mocked-fallback'
 }
+
+// ── Datum AI · Hook 6 · Summarize Document ────────────────────────────────
+
+export interface SummarizeDocumentRequest {
+  document_id: string
+  document_title?: string
+  body: string
+  part_name?: string
+}
+
+export interface SummarizeDocumentResponse {
+  summary: string
+  key_points: string[]
+  action_items: string[]
+  word_count_in: number
+  word_count_out: number
+  confidence: number
+  source: 'llm' | 'mocked-fallback'
+  declined: boolean
+  declined_reason?: string | null
+}

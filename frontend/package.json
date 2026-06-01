@@ -16,6 +16,7 @@
     "@babylonjs/loaders": "^8.0.0",
     "@babylonjs/materials": "^8.0.0",
     "@react-pdf/renderer": "^4.5.1",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.469.0",
     "next": "14.2.33",
     "opencascade.js": "2.0.0-beta.b5ff984",

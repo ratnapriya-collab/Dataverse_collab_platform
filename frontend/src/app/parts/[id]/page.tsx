@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Images, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import UserBadge from '@/components/ui/UserBadge'
 import CreateDecisionModal from '@/components/decisions/CreateDecisionModal'
@@ -14,6 +14,10 @@ import PartViewTabs from '@/components/parts/PartViewTabs'
 import PartConversationHub from '@/components/parts/PartConversationHub'
 import { useCommentsStore } from '@/features/comments/store/commentsStore'
 import { useThreads as useV2Threads } from '@/features/comments/hooks/useThreadsStorage'
+import CaptureButton from '@/features/capture/components/CaptureButton'
+import CaptureGallery from '@/features/capture/components/CaptureGallery'
+import { useViewerCapture } from '@/features/capture/hooks/useViewerCapture'
+import { useCaptureStore } from '@/features/capture/store/captureStore'
 import { ApiError, api, apiUrl } from '@/lib/api'
 import { clearToken } from '@/lib/auth'
 import { SEED_FULL_DECISIONS, SEED_MEMBERS } from '@/lib/mockWorkspace'
@@ -203,6 +207,24 @@ export default function PartPage() {
   // Right rail (conversation hub) collapse state — gives the 3D viewer the
   // full width when the user wants to focus on geometry without distractions.
   const [rightRailCollapsed, setRightRailCollapsed] = useState(false)
+
+  // Capture-View feature — wraps the WebGL canvas + DOM overlays in a ref
+  // we can hand to html2canvas. Gallery slides in from the right edge.
+  const viewerContainerRef = useRef<HTMLDivElement | null>(null)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const captureCount = useCaptureStore((s) => s.captures.length)
+  const cleanupCaptures = useCaptureStore((s) => s.cleanup)
+  const clearCaptures = useCaptureStore((s) => s.clear)
+  // Clean up Object URLs on unmount AND when the part id changes — captures
+  // from one part should never bleed into another.
+  useEffect(() => {
+    return () => cleanupCaptures()
+  }, [cleanupCaptures])
+  useEffect(() => {
+    // Reset gallery when switching parts. Different /parts/[id] route swap
+    // doesn't always unmount the page in app-router, so explicit reset.
+    return () => clearCaptures()
+  }, [partId, clearCaptures])
 
   // Smart-pin visibility (v2): the floating annotation card in the viewer
   // only shows when the user clicks a comment in the panel OR clicks the
@@ -608,7 +630,7 @@ export default function PartPage() {
           />
         )}
 
-        <div className="relative bg-slate-100">
+        <div ref={viewerContainerRef} className="relative bg-slate-100">
           <ViewerCanvas
             onFacePick={handleFacePick}
             partUrl={fileUrl}
@@ -623,9 +645,6 @@ export default function PartPage() {
             // Step 2: clicking the floating card opens the right-side
             // thread drawer for that comment.
             onCardClick={(faceUuid) => {
-              // Find the matching v2 thread by faceUuid; sync the store
-              // (in case the user reached the card via a pin click, not
-              // the left panel), then explicitly open the drawer.
               const thread = v2Threads.find((t) => t.anchor.faceUuid === faceUuid)
               if (thread !== undefined) {
                 useCommentsStore.getState().selectThread(thread.id, 'pin')
@@ -634,6 +653,22 @@ export default function PartPage() {
             }}
             cardVisibility="selected-only"
             visibleCardFor={selectedFaceUuid}
+          />
+          {/* Capture-view affordance — floats over the viewer top-right. */}
+          <CaptureToolbar
+            viewerContainerRef={viewerContainerRef}
+            partId={part.id}
+            partName={part.name}
+            captureCount={captureCount}
+            onOpenGallery={() => setGalleryOpen(true)}
+            onCaptureError={(err) => {
+              // eslint-disable-next-line no-console
+              console.error('Capture failed:', err)
+              window.alert(`Capture failed: ${err.message}`)
+            }}
+            onCaptureSuccess={() => {
+              if (!galleryOpen) setGalleryOpen(true)
+            }}
           />
         </div>
 
@@ -657,7 +692,66 @@ export default function PartPage() {
           onCreated={handleDecisionCreated}
         />
       )}
+
+      {/* Capture gallery — slides in from the right edge over everything. */}
+      <CaptureGallery
+        open={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        partName={part.name}
+      />
     </main>
+  )
+}
+
+/**
+ * CaptureToolbar — small floating cluster on the viewer's top-right.
+ * Renders the Capture button + a chip linking to the gallery when there's
+ * something captured. Extracted so the hook usage stays close to the ref.
+ */
+function CaptureToolbar({
+  viewerContainerRef,
+  partId,
+  partName,
+  captureCount,
+  onOpenGallery,
+  onCaptureError,
+  onCaptureSuccess,
+}: {
+  viewerContainerRef: React.RefObject<HTMLElement>
+  partId: string
+  partName: string
+  captureCount: number
+  onOpenGallery: () => void
+  onCaptureError: (err: Error) => void
+  onCaptureSuccess: () => void
+}): JSX.Element {
+  const { capture, isReady } = useViewerCapture({
+    viewerContainerRef,
+    partId,
+    partName,
+  })
+  return (
+    <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2">
+      <CaptureButton
+        onCapture={capture}
+        onSuccess={onCaptureSuccess}
+        onError={onCaptureError}
+        isReady={isReady}
+        className="pointer-events-auto"
+      />
+      <button
+        type="button"
+        onClick={onOpenGallery}
+        aria-label={`Open captured-views gallery (${captureCount})`}
+        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-md backdrop-blur transition hover:border-primary/40 hover:text-primary hover:shadow-lg"
+      >
+        <Images className="h-3.5 w-3.5 text-primary" />
+        Gallery
+        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums text-primary">
+          {captureCount}
+        </span>
+      </button>
+    </div>
   )
 }
 

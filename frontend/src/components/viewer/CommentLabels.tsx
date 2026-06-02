@@ -204,6 +204,10 @@ export default function CommentLabels({
   visibleCardFor = null,
 }: Props) {
   const scene = useViewerStore((s) => s.babylonScene)
+  // Global "hide annotations on viewer" switch — driven from the
+  // Comments panel header. When false we render nothing at all, so
+  // pins (SVG layer) AND floating cards (DOM layer) both disappear.
+  const commentsOverlayVisible = useViewerStore((s) => s.commentsOverlayVisible)
   const labelRefs = useRef<Map<string, HTMLElement>>(new Map())
   const pinRefs = useRef<Map<string, SVGGElement>>(new Map())
 
@@ -282,6 +286,11 @@ export default function CommentLabels({
     raf = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(raf)
   }, [scene, labels])
+
+  // Global hide switch — driven by the Comments panel header toggle.
+  // All hooks above must run unconditionally (React rules-of-hooks); the
+  // bail-out happens AFTER hooks so we don't break the hook call order.
+  if (!commentsOverlayVisible) return null
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10">

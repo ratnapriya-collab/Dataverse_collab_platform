@@ -29,6 +29,7 @@ import CommentComposer from './CommentComposer'
 import ThreadDrawer from './ThreadDrawer'
 import ExportButton from './ExportButton'
 import ExportDialog from './ExportDialog'
+import ToggleOverlayButton from './ToggleOverlayButton'
 
 interface Props {
   partId: string
@@ -147,7 +148,10 @@ export default function CommentsPanel({
             </span>
           </p>
         </div>
-        <ExportButton totalCount={threads.length} visibleCount={visibleThreads.length} />
+        <div className="flex items-center gap-1.5">
+          <ToggleOverlayButton totalCount={threads.length} />
+          <ExportButton totalCount={threads.length} visibleCount={visibleThreads.length} />
+        </div>
       </header>
 
       <FilterBar />

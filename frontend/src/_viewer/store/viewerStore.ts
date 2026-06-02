@@ -84,6 +84,13 @@ interface ViewerStore {
   setPmiAnnotations: (a: PMIAnnotation[]) => void
   togglePmi:         () => void
   setPmiVisibility:  (id: string, visible: boolean) => void
+
+  // Comments overlay (pins + floating comment cards on the 3D viewer).
+  // Single switch — both render layers gate on this flag together so the
+  // viewer goes from "annotated" to "clean geometry" in one click.
+  commentsOverlayVisible: boolean
+  toggleCommentsOverlay:  () => void
+  setCommentsOverlayVisible: (visible: boolean) => void
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -188,4 +195,10 @@ export const useViewerStore = create<ViewerStore>((set) => ({
   setPmiVisibility: (id, visible) => set((s) => ({
     pmiAnnotations: s.pmiAnnotations.map(a => a.id === id ? { ...a, visible } : a),
   })),
+
+  // Comments overlay — default ON (matches the original behaviour). When
+  // false, CommentLabels renders nothing — clean geometry view.
+  commentsOverlayVisible: true,
+  toggleCommentsOverlay: () => set((s) => ({ commentsOverlayVisible: !s.commentsOverlayVisible })),
+  setCommentsOverlayVisible: (commentsOverlayVisible) => set({ commentsOverlayVisible }),
 }))

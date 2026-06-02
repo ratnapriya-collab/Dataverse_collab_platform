@@ -22,8 +22,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Bookmark,
+  Check,
   ChevronDown,
   ClipboardCheck,
+  Copy,
   Edit3,
   Link2,
   Maximize2,
@@ -32,11 +34,15 @@ import {
   Pin,
   Plus,
   RefreshCw,
+  Trash2,
+  X,
 } from 'lucide-react'
 import Avatar from '@/components/workspace/Avatar'
 import { formatTimeAgo, type MockFullDecision, type MockMember } from '@/lib/mockWorkspace'
+import { useProjectDashboards, type DashboardsApi } from '@/hooks/useProjectDashboards'
 
 interface Props {
+  projectId: string
   decisions: MockFullDecision[]
   members: MockMember[]
   bookmarks: string[]
@@ -73,6 +79,7 @@ const ACCENT: Record<'rose' | 'amber' | 'emerald', { ring: string; text: string 
 const ONE_DAY_MS = 24 * 3_600_000
 
 export default function ProjectOverviewTab({
+  projectId,
   decisions,
   members,
   bookmarks,
@@ -80,6 +87,17 @@ export default function ProjectOverviewTab({
 }: Props): JSX.Element {
   const [expandedId, setExpandedId] = useState<CardId | null>(null)
   const [menuId, setMenuId] = useState<CardId | null>(null)
+
+  // Dashboards model — owns the list of "views" shown above the cards
+  // (Project Overview by default, user can add more, rename, etc.).
+  const dashboards = useProjectDashboards(projectId)
+
+  // Close any expanded card / open menu when switching dashboards so the
+  // user lands on a clean grid.
+  useEffect(() => {
+    setExpandedId(null)
+    setMenuId(null)
+  }, [dashboards.activeId])
 
   // ESC closes whatever's open; outside-click closes the menu.
   useEffect(() => {
@@ -137,7 +155,7 @@ export default function ProjectOverviewTab({
 
   return (
     <div className="space-y-5">
-      <SubHeader />
+      <DashboardSubHeader api={dashboards} />
 
       {expandedId !== null ? (
         <ExpandedView
@@ -171,17 +189,203 @@ export default function ProjectOverviewTab({
 }
 
 // ── Sub-header (above the cards) ──────────────────────────────────────────
+//
+// Stateful: drives the dashboard switcher dropdown, inline-rename input,
+// and the "..." menu. All three were dead UI prior to this — now they
+// read/write through the useProjectDashboards hook.
 
-function SubHeader(): JSX.Element {
+function DashboardSubHeader({ api }: { api: DashboardsApi }): JSX.Element {
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [draftName, setDraftName] = useState(api.active.name)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  // Reset draft whenever the user switches dashboards or cancels.
+  useEffect(() => {
+    setDraftName(api.active.name)
+    setRenaming(false)
+  }, [api.active.id, api.active.name])
+
+  // Outside-click + Esc close every popover. Esc also exits rename mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      if (renaming) {
+        setRenaming(false)
+        setDraftName(api.active.name)
+      } else if (menuOpen) setMenuOpen(false)
+      else if (switcherOpen) setSwitcherOpen(false)
+    }
+    const onMouseDown = (e: MouseEvent): void => {
+      const t = e.target as Element | null
+      if (switcherOpen && !t?.closest?.('[data-dash-switcher]')) setSwitcherOpen(false)
+      if (menuOpen && !t?.closest?.('[data-dash-menu]')) setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onMouseDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onMouseDown)
+    }
+  }, [switcherOpen, menuOpen, renaming, api.active.name])
+
+  // Auto-focus + select-all when entering rename mode.
+  useEffect(() => {
+    if (!renaming) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [renaming])
+
+  const commitRename = (): void => {
+    const trimmed = draftName.trim()
+    if (trimmed !== '' && trimmed !== api.active.name) {
+      api.rename(api.active.id, trimmed)
+    } else {
+      setDraftName(api.active.name)
+    }
+    setRenaming(false)
+  }
+
+  const handleDelete = (): void => {
+    setMenuOpen(false)
+    if (api.dashboards.length <= 1) {
+      window.alert("Can't delete the only dashboard. Create another one first.")
+      return
+    }
+    const ok = window.confirm(`Delete dashboard "${api.active.name}"? This cannot be undone.`)
+    if (ok) api.remove(api.active.id)
+  }
+
+  const handleDuplicate = (): void => {
+    setMenuOpen(false)
+    api.duplicate(api.active.id)
+  }
+
+  const handleAddNew = (): void => {
+    setSwitcherOpen(false)
+    const created = api.add()
+    // Drop straight into rename mode so the user can name it.
+    setDraftName(created.name)
+    // setRenaming AFTER the effect that resets draftName runs; defer one tick.
+    window.setTimeout(() => setRenaming(true), 0)
+  }
+
   return (
     <div className="flex items-center justify-between">
-      <button
-        type="button"
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-900 transition hover:text-primary"
-      >
-        Project Overview
-        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-      </button>
+      {/* ── Title / dashboard switcher ─────────────────────────────────── */}
+      <div className="relative flex items-center gap-2" data-dash-switcher>
+        {renaming ? (
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename()
+                else if (e.key === 'Escape') {
+                  setDraftName(api.active.name)
+                  setRenaming(false)
+                }
+              }}
+              onBlur={commitRename}
+              maxLength={60}
+              className="rounded-md border border-primary/40 bg-white px-2 py-1 text-sm font-bold text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+              aria-label="Rename dashboard"
+            />
+            <button
+              type="button"
+              aria-label="Save name"
+              onMouseDown={(e) => e.preventDefault() /* keep input from blurring before click */}
+              onClick={commitRename}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-white transition hover:bg-primary-700"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Cancel rename"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setDraftName(api.active.name)
+                setRenaming(false)
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setSwitcherOpen((p) => !p)}
+            aria-expanded={switcherOpen}
+            aria-haspopup="menu"
+            className={[
+              'inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-bold transition',
+              switcherOpen
+                ? 'bg-primary/5 text-primary'
+                : 'text-slate-900 hover:bg-slate-50 hover:text-primary',
+            ].join(' ')}
+          >
+            <span className="max-w-[280px] truncate">{api.active.name}</span>
+            <ChevronDown
+              className={[
+                'h-3.5 w-3.5 text-slate-400 transition',
+                switcherOpen ? 'rotate-180 text-primary' : '',
+              ].join(' ')}
+            />
+          </button>
+        )}
+
+        {switcherOpen && !renaming && (
+          <div
+            role="menu"
+            className="dv-anim-pop absolute left-0 top-9 z-30 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+          >
+            <div className="border-b border-slate-100 bg-slate-50/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Dashboards in this project
+            </div>
+            <ul className="max-h-[260px] overflow-y-auto py-1">
+              {api.dashboards.map((d) => {
+                const isActive = d.id === api.activeId
+                return (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        api.setActiveId(d.id)
+                        setSwitcherOpen(false)
+                      }}
+                      className={[
+                        'flex w-full items-center justify-between gap-2 px-3 py-2 text-[12px] transition',
+                        isActive
+                          ? 'bg-primary/5 text-primary font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50',
+                      ].join(' ')}
+                    >
+                      <span className="truncate">{d.name}</span>
+                      {isActive && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="flex w-full items-center gap-2 border-t border-slate-100 bg-slate-50/40 px-3 py-2.5 text-[12px] font-semibold text-primary transition hover:bg-primary/5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add new dashboard
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Right-side: refresh stamp + edit + more ────────────────────── */}
       <div className="flex items-center gap-3 text-[10px] text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <RefreshCw className="h-3 w-3" />
@@ -190,20 +394,102 @@ function SubHeader(): JSX.Element {
         </span>
         <button
           type="button"
-          aria-label="Edit overview"
+          aria-label="Rename dashboard"
+          onClick={() => {
+            setDraftName(api.active.name)
+            setRenaming(true)
+            setSwitcherOpen(false)
+            setMenuOpen(false)
+          }}
           className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-white shadow-sm transition hover:bg-primary-700"
         >
           <Edit3 className="h-3.5 w-3.5" />
         </button>
-        <button
-          type="button"
-          aria-label="More options"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" />
-        </button>
+        <div className="relative" data-dash-menu>
+          <button
+            type="button"
+            aria-label="Dashboard options"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((p) => !p)}
+            className={[
+              'flex h-7 w-7 items-center justify-center rounded-md transition',
+              menuOpen
+                ? 'bg-primary/5 text-primary'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900',
+            ].join(' ')}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="dv-anim-pop absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+            >
+              <MenuItem
+                icon={Edit3}
+                label="Rename"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setDraftName(api.active.name)
+                  setRenaming(true)
+                }}
+              />
+              <MenuItem icon={Copy} label="Duplicate" onClick={handleDuplicate} />
+              <MenuItem
+                icon={Plus}
+                label="Add new dashboard"
+                onClick={() => {
+                  setMenuOpen(false)
+                  handleAddNew()
+                }}
+              />
+              <div className="my-1 border-t border-slate-100" />
+              <MenuItem
+                icon={Trash2}
+                label="Delete dashboard"
+                danger
+                disabled={api.dashboards.length <= 1}
+                onClick={handleDelete}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  danger = false,
+  disabled = false,
+}: {
+  icon: typeof Edit3
+  label: string
+  onClick: () => void
+  danger?: boolean
+  disabled?: boolean
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition',
+        disabled
+          ? 'cursor-not-allowed text-slate-300'
+          : danger
+            ? 'text-rose-600 hover:bg-rose-50'
+            : 'text-slate-700 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
   )
 }
 

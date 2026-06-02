@@ -245,13 +245,14 @@ export default function ProjectHubPage(): JSX.Element {
           <div className="dv-anim-fade-up mt-6" style={{ animationDelay: '160ms' }} key={tab}>
             {tab === 'overview' && (
               <ProjectOverviewTab
+                projectId={id}
                 decisions={decisions}
                 members={projectMembers}
                 bookmarks={bookmarks}
-                onToggleBookmark={(id) => {
-                  toggleBookmark(id)
+                onToggleBookmark={(bid) => {
+                  toggleBookmark(bid)
                   setToast({
-                    message: bookmarks.includes(id) ? 'Removed from Pins' : 'Pinned to this project',
+                    message: bookmarks.includes(bid) ? 'Removed from Pins' : 'Pinned to this project',
                     tone: 'success',
                   })
                 }}

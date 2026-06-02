@@ -1,7 +1,7 @@
 'use client'
 
 import { type FormEvent, type ReactNode, useState } from 'react'
-import { AlertTriangle, Archive, Info, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, Archive, Save, Trash2 } from 'lucide-react'
 import { formatDate, type MockWorkspace } from '@/lib/mockWorkspace'
 import ConfirmDialog from './ConfirmDialog'
 
@@ -128,13 +128,6 @@ export default function SettingsTab({ workspace, memberCount, onSave, onInfo }: 
           onClick={() => setPendingDelete(true)}
         />
       </section>
-
-      {/* Disclaimer */}
-      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-        <Info className="mr-1 inline h-3 w-3 -translate-y-px text-slate-400" />
-        This is a demo workspace. Destructive actions show the confirm dialog but
-        don't actually modify anything.
-      </p>
 
       {pendingArchive && (
         <ConfirmDialog

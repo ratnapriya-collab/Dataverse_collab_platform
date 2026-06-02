@@ -422,9 +422,6 @@ export default function MyWorkPage() {
             </ul>
           )}
 
-          <p className="mt-12 text-center text-[11px] text-slate-400">
-            Demo workspace · Mock data — refresh resets state.
-          </p>
         </section>
       </div>
     </div>

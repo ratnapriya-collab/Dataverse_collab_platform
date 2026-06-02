@@ -363,10 +363,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Mock disclaimer — tiny, slate, at the bottom. */}
-        <p className="mt-12 text-center text-[11px] text-slate-400">
-          Demo workspace · Changes here are mock data and reset on page refresh.
-        </p>
       </section>
       </div>
     </div>

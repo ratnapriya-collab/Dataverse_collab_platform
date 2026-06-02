@@ -161,10 +161,10 @@ const DAYS = 86_400_000
 
 export const SEED_WORKSPACE: MockWorkspace = {
   id: 'ws_demo',
-  name: 'DataVerse Demo',
-  slug: 'dataverse-demo',
+  name: 'DataVerse',
+  slug: 'dataverse',
   description:
-    'A demo workspace for reviewing CAD parts and anchoring decisions. Replace with your real workspace.',
+    'Workspace for reviewing CAD parts and anchoring decisions.',
   created_at: new Date(NOW - 90 * DAYS).toISOString(),
 }
 

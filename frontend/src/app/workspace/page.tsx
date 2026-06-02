@@ -39,7 +39,7 @@ export default function WorkspacePage() {
   const [user, setUser] = useState<UserRead | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Active workspace — driven by ?ws=<id>. Falls back to the demo workspace.
+  // Active workspace — driven by ?ws=<id>. Falls back to the default workspace.
   const wsParam = searchParams?.get('ws') ?? null
   const activeWorkspace = useMemo(() => {
     return (wsParam !== null ? getWorkspace(wsParam) : undefined) ?? SEED_WORKSPACE
@@ -335,9 +335,6 @@ export default function WorkspacePage() {
           <ProjectsGrid projects={workspaceProjects} />
         </div>
 
-        <p className="mt-12 text-center text-[11px] text-slate-400">
-          Demo workspace · All data here is mock and resets on refresh.
-        </p>
       </section>
       </div>
 

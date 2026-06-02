@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.database import engine
 from app.routes import anchors as anchors_routes
 from app.routes import auth as auth_routes
+from app.routes import captures as captures_routes
 from app.routes import datum as datum_routes
 from app.routes import decisions as decisions_routes
 from app.routes import parts as parts_routes
@@ -59,6 +60,9 @@ def create_app() -> FastAPI:
     app.include_router(datum_routes.router, prefix="/api/datum", tags=["datum"])
     # Mounted at /api so threads.py's paths read /api/threads, /api/replies/...
     app.include_router(threads_routes.router, prefix="/api", tags=["threads"])
+    # Mounted at /api — captures.py uses /parts/{id}/captures and /captures/{id}/image,
+    # which become /api/parts/{id}/captures and /api/captures/{id}/image.
+    app.include_router(captures_routes.router, prefix="/api", tags=["captures"])
 
     @app.get("/health")
     def health() -> dict[str, object]:

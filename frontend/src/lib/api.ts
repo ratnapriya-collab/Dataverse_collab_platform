@@ -247,4 +247,121 @@ export const api = {
       })
     },
   },
+
+  captures: {
+    list(partId: string): Promise<CaptureRead[]> {
+      return request<CaptureRead[]>(`/api/parts/${encodeURIComponent(partId)}/captures`, {
+        auth: true,
+      })
+    },
+
+    /** Upload a captured image. The Blob can be a JPEG/PNG/WebP; pass MIME via the blob.type. */
+    async create(
+      partId: string,
+      blob: Blob,
+      meta: {
+        caption?: string
+        width: number
+        height: number
+        cameraState?: Record<string, unknown> | null
+      },
+    ): Promise<CaptureRead> {
+      const token = getToken()
+      if (token === null) {
+        throw new ApiError(401, 'no_token', 'Not authenticated')
+      }
+      const form = new FormData()
+      // Filename matters for FastAPI's UploadFile — give it a hint based on MIME.
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'
+      form.append('file', blob, `capture.${ext}`)
+      form.append('caption', meta.caption ?? '')
+      form.append('width', String(meta.width))
+      form.append('height', String(meta.height))
+      if (meta.cameraState !== null && meta.cameraState !== undefined) {
+        form.append('camera_state_json', JSON.stringify(meta.cameraState))
+      }
+      let response: Response
+      try {
+        response = await fetch(`${BASE_URL}/api/parts/${encodeURIComponent(partId)}/captures`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        })
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'network error'
+        throw new ApiError(0, 'network_error', message)
+      }
+      const text = await response.text()
+      const parsed: unknown = text.length > 0 ? safeJsonParse(text) : null
+      if (!response.ok) {
+        const { code, message } = extractError(parsed, response.status)
+        throw new ApiError(response.status, code, message)
+      }
+      return parsed as CaptureRead
+    },
+
+    update(id: string, body: { caption?: string }): Promise<CaptureRead> {
+      return request<CaptureRead>(`/api/captures/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body,
+        auth: true,
+      })
+    },
+
+    delete(id: string): Promise<void> {
+      return request<void>(`/api/captures/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        auth: true,
+      })
+    },
+
+    reorder(partId: string, orderedIds: string[]): Promise<CaptureRead[]> {
+      return request<CaptureRead[]>(
+        `/api/parts/${encodeURIComponent(partId)}/captures/reorder`,
+        { method: 'POST', body: { ordered_ids: orderedIds }, auth: true },
+      )
+    },
+
+    /**
+     * Fetch an image's bytes as a Blob, sending the Bearer token.
+     *
+     * `<img src>` doesn't send Authorization headers — so for auth-protected
+     * image endpoints we fetch with auth, get a Blob, and the caller
+     * (captureStore) turns it into a Blob URL for the gallery's <img>.
+     */
+    async fetchImageBlob(captureId: string): Promise<Blob> {
+      const token = getToken()
+      if (token === null) {
+        throw new ApiError(401, 'no_token', 'Not authenticated')
+      }
+      const response = await fetch(
+        `${BASE_URL}/api/captures/${encodeURIComponent(captureId)}/image`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (!response.ok) {
+        throw new ApiError(response.status, 'image_fetch_failed', `Failed to load capture image (${response.status})`)
+      }
+      return response.blob()
+    },
+  },
+}
+
+// ── Capture types — kept inline because they're tightly coupled to the
+// `captures.*` methods above. (The frontend's domain type in
+// features/capture/types lives separately and references this one.)
+
+export interface CaptureRead {
+  id: string
+  part_id: string
+  author_id: string
+  caption: string
+  width: number
+  height: number
+  image_url: string
+  image_mime: string
+  image_size: number
+  camera_state: Record<string, unknown> | null
+  sort_order: number
+  created_at: string
+  updated_at: string
 }

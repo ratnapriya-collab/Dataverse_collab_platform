@@ -19,16 +19,22 @@
  */
 
 import { useState, type DragEvent } from 'react'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { GripVertical, History, Loader2, Trash2 } from 'lucide-react'
 import type { Capture } from '../types/capture.types'
 
 interface Props {
   capture: Capture
   index: number
   total: number
-  onUpdateCaption: (id: string, caption: string) => void
-  onRemove: (id: string) => void
-  onReorder: (fromIdx: number, toIdx: number) => void
+  // Store actions are async (server round-trip), but we treat them as
+  // fire-and-forget here — store handles optimistic UI + rollback on error.
+  onUpdateCaption: (id: string, caption: string) => void | Promise<void>
+  onRemove: (id: string) => void | Promise<void>
+  onReorder: (fromIdx: number, toIdx: number) => void | Promise<void>
+  /** Restore the 3D viewer to this capture's saved view state. */
+  onRestoreView: (capture: Capture) => void | Promise<void>
+  /** True while this thumbnail's restore animation is running. */
+  isRestoring?: boolean
   /** When this thumb is mid-drag, we paint a dotted outline. */
   isBeingDragged?: boolean
   /** When something else is hovering over this thumb during drag. */
@@ -45,6 +51,8 @@ export default function CaptureThumbnail({
   onUpdateCaption,
   onRemove,
   onReorder,
+  onRestoreView,
+  isRestoring = false,
   isBeingDragged = false,
   isDropTarget = false,
   setDraggingIndex,
@@ -107,16 +115,58 @@ export default function CaptureThumbnail({
         <GripVertical className="h-3.5 w-3.5" />
       </span>
 
-      {/* Thumbnail — fixed aspect, blob URL src */}
+      {/* Thumbnail — also the "Restore View" affordance. Clicking flies
+          the 3D viewer back to the camera + display state that was active
+          at capture time. */}
       <div className="shrink-0">
-        <img
-          src={capture.previewUrl}
-          alt={capture.caption !== '' ? capture.caption : `Capture ${index + 1}`}
-          width={96}
-          height={64}
-          loading="lazy"
-          className="block h-16 w-24 rounded border border-slate-200 bg-slate-100 object-cover"
-        />
+        <button
+          type="button"
+          onClick={() => onRestoreView(capture)}
+          disabled={isRestoring || capture.camera === null}
+          aria-label={`Restore view ${index + 1}`}
+          title={
+            capture.camera === null
+              ? 'View state was not captured for this snapshot'
+              : 'Restore this view in the 3D viewer'
+          }
+          className={[
+            'group/restore relative block h-16 w-24 overflow-hidden rounded border bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-primary/40',
+            isRestoring
+              ? 'border-primary ring-2 ring-primary/40'
+              : 'border-slate-200 hover:border-primary/60',
+            capture.camera === null ? 'cursor-not-allowed' : 'cursor-pointer',
+          ].join(' ')}
+        >
+          <img
+            src={capture.previewUrl}
+            alt={capture.caption !== '' ? capture.caption : `Capture ${index + 1}`}
+            width={96}
+            height={64}
+            loading="lazy"
+            className="block h-full w-full object-cover transition group-hover/restore:scale-105"
+          />
+          {/* Hover overlay — only shown when restoring is possible. */}
+          {capture.camera !== null && !isRestoring && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center justify-center bg-slate-900/55 opacity-0 transition group-hover/restore:opacity-100"
+            >
+              <span className="flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary shadow-sm">
+                <History className="h-2.5 w-2.5" />
+                Restore
+              </span>
+            </span>
+          )}
+          {/* Active state — spinner while the camera tweens. */}
+          {isRestoring && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center justify-center bg-primary/30 backdrop-blur-[1px]"
+            >
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Caption + meta */}

@@ -20,6 +20,7 @@
  */
 
 import { useCallback } from 'react'
+import { api } from '@/lib/api'
 import { useViewerStore } from '@/_viewer/store/viewerStore'
 import { useCaptureStore } from '../store/captureStore'
 import {
@@ -27,7 +28,12 @@ import {
   captureComposite,
   hasDomOverlays,
 } from '../utils/compositeOverlay'
-import type { Capture, CaptureOptions, CameraState } from '../types/capture.types'
+import type {
+  Capture,
+  CaptureOptions,
+  CameraState,
+  ViewSettings,
+} from '../types/capture.types'
 
 interface UseViewerCaptureArgs {
   /** Ref to the DIV containing the canvas + DOM overlays. */
@@ -44,8 +50,20 @@ interface UseViewerCaptureApi {
   isReady: boolean
 }
 
-function mockId(prefix: string): string {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
+/** Snapshot the non-camera display state (shading, grid, explode, etc.)
+ * from the viewer store at capture time. These flow back through the
+ * Restore View feature so the model looks the same as it did. */
+function readViewSettings(): ViewSettings {
+  const s = useViewerStore.getState()
+  return {
+    cameraMode: s.cameraMode,
+    shadingMode: s.shadingMode,
+    gridVisible: s.gridVisible,
+    axesVisible: s.axesVisible,
+    explodeFactor: s.explodeFactor,
+    sectionPlane: s.sectionPlane,
+    pmiVisible: s.pmiVisible,
+  }
 }
 
 /** Babylon ArcRotateCamera reader — best-effort, returns nulls if any field
@@ -78,7 +96,7 @@ export function useViewerCapture({
 }: UseViewerCaptureArgs): UseViewerCaptureApi {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scene = useViewerStore((s) => (s as any).babylonScene)
-  const addCapture = useCaptureStore((s) => s.add)
+  const addPersisted = useCaptureStore((s) => s.addPersisted)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineCanvas: HTMLCanvasElement | null = (scene as any)?.getEngine?.()?.getRenderingCanvas?.() ?? null
@@ -122,24 +140,47 @@ export function useViewerCapture({
             false,
           )
 
-      const previewUrl = URL.createObjectURL(result.blob)
-      const newCapture: Capture = {
-        id: mockId('cap'),
-        previewUrl,
-        blob: result.blob,
+      // Round-trip through the backend FIRST. We don't push to the store
+      // until the server has assigned an id and persisted the bytes — that
+      // way the local model never diverges from Postgres. The user pays a
+      // small latency hit (typically <300ms) and gets reliability for it.
+      const cameraState = readCameraState(scene)
+      const viewSettings = readViewSettings()
+      // We pack camera + view into the same JSON column server-side. The
+      // server treats `camera_state` as opaque JSON, so any shape goes.
+      // On hydrate the captureStore unpacks them again.
+      const server = await api.captures.create(partId, result.blob, {
         caption: '',
         width: result.width,
         height: result.height,
-        capturedAt: new Date().toISOString(),
-        camera: readCameraState(scene),
+        cameraState: {
+          alpha: cameraState.alpha,
+          beta: cameraState.beta,
+          radius: cameraState.radius,
+          target: cameraState.target,
+          view: viewSettings,
+        },
+      })
+
+      const previewUrl = URL.createObjectURL(result.blob)
+      const newCapture: Capture = {
+        id: server.id,
+        previewUrl,
+        blob: result.blob,
+        caption: server.caption,
+        width: server.width,
+        height: server.height,
+        capturedAt: server.created_at,
+        camera: cameraState,
+        view: viewSettings,
         partId,
         partName,
         partVersion,
       }
-      addCapture(newCapture)
+      addPersisted(newCapture)
       return newCapture
     },
-    [viewerContainerRef, isReady, engineCanvas, scene, addCapture, partId, partName, partVersion],
+    [viewerContainerRef, isReady, engineCanvas, scene, addPersisted, partId, partName, partVersion],
   )
 
   return { capture, isReady }

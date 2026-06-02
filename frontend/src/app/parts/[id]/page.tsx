@@ -73,6 +73,11 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max - 1).trimEnd() + '…'
 }
 
+// Visual ceiling for "+" anchor pins drawn on the viewer. More pins than
+// this turn the model into a confetti field; the side panel still lists
+// every decision so nothing is hidden, just not redundantly rendered.
+const MAX_VISIBLE_PINS = 7
+
 // ── Mock-ID detection + seed-data builders ──────────────────────────────────
 
 /** Demo part IDs surfaced by the Project Hub Parts grid look like `demo_1`. */
@@ -214,17 +219,22 @@ export default function PartPage() {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const captureCount = useCaptureStore((s) => s.captures.length)
   const cleanupCaptures = useCaptureStore((s) => s.cleanup)
-  const clearCaptures = useCaptureStore((s) => s.clear)
-  // Clean up Object URLs on unmount AND when the part id changes — captures
-  // from one part should never bleed into another.
+  const loadCapturesForPart = useCaptureStore((s) => s.loadForPart)
+
+  // Hydrate captures from Postgres whenever the part loads. We wait for the
+  // part record so we can pass partName (used in PDF cover + thumbnails).
+  // The store guards against stale loads when the partId changes mid-fetch.
+  useEffect(() => {
+    if (partId === undefined || part === null) return
+    void loadCapturesForPart(part.id, part.name)
+  }, [partId, part, loadCapturesForPart])
+
+  // Release blob URLs on unmount. Do NOT delete the server-side captures
+  // here — they're the persistent source of truth and should survive
+  // every page nav, browser close, and re-login.
   useEffect(() => {
     return () => cleanupCaptures()
   }, [cleanupCaptures])
-  useEffect(() => {
-    // Reset gallery when switching parts. Different /parts/[id] route swap
-    // doesn't always unmount the page in app-router, so explicit reset.
-    return () => clearCaptures()
-  }, [partId, clearCaptures])
 
   // Smart-pin visibility (v2): the floating annotation card in the viewer
   // only shows when the user clicks a comment in the panel OR clicks the
@@ -458,7 +468,10 @@ export default function PartPage() {
         locked: dominant.state === 'ACCEPTED' || dominant.state === 'SUPERSEDED',
       })
     }
-    return labelList
+    // Cap visible pins to keep the viewer readable. The side-panel
+    // decisions list still shows everything; we just stop painting the
+    // SVG markers past N so the model isn't a sea of "+" glyphs.
+    return labelList.slice(0, MAX_VISIBLE_PINS)
   }, [labelSourceDecisions])
 
   function handleSignOut(): void {

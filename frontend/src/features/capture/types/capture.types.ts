@@ -19,12 +19,38 @@ export interface CameraState {
   target: { x: number; y: number; z: number } | null
 }
 
+/**
+ * Display + scene settings recorded at capture time. Restoring a view
+ * applies these on top of the camera state so the scene matches the
+ * thumbnail exactly — not just the angle, but shading, grid, explode,
+ * section plane, etc.
+ *
+ * All fields optional so older captures (which only stored camera) keep
+ * restoring camera-only without crashing.
+ */
+export interface ViewSettings {
+  cameraMode?: 'perspective' | 'orthographic'
+  shadingMode?: 'shaded' | 'wireframe' | 'shadedEdges'
+  gridVisible?: boolean
+  axesVisible?: boolean
+  /** 0 = assembled, 1 = fully exploded. */
+  explodeFactor?: number
+  sectionPlane?: { axis: 'X' | 'Y' | 'Z'; offset: number } | null
+  pmiVisible?: boolean
+}
+
 export interface Capture {
-  /** Stable id — used as a React key and as the index for reorder ops. */
+  /** Server-assigned id (UUID). Stable across reloads.
+   *
+   * Pre-server captures are no longer a thing — every capture is POSTed
+   * to /api/parts/{id}/captures before being added to the store, so by
+   * the time it lands here, the id is canonical.
+   */
   id: string
-  /** A blob URL for `<img>` preview. Revoke before dropping the Capture. */
+  /** A blob URL for `<img>` preview. The store owns + revokes this. */
   previewUrl: string
-  /** The raw image bytes, kept so we can re-create the dataURL for PDF. */
+  /** The raw image bytes, kept so we can re-create the dataURL for PDF
+   *  without paying a second round-trip to the server. */
   blob: Blob
   /** User-editable caption, default ''. Rendered under the image in PDF. */
   caption: string
@@ -33,8 +59,12 @@ export interface Capture {
   height: number
   /** ISO timestamp at capture. */
   capturedAt: string
-  /** Camera state at capture — opt-in, for future "open this view" feature. */
+  /** Camera state at capture — drives the "Restore view" feature. */
   camera: CameraState | null
+  /** Display settings (shading, grid, explode, section, PMI) recorded
+   *  at capture so Restore View matches the thumbnail exactly. Optional
+   *  for backwards compatibility with captures taken before this feature. */
+  view?: ViewSettings
   /** Part this capture was taken from — for the PDF cover page. */
   partId: string
   partName: string

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DataVerse Collab — Deployment Handoff</title>
+<style>
+  /* ── Reset + base ───────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 80px; }
+
+  header.hero {
+    background: linear-gradient(135deg, #15524a 0%, #1f7a6d 60%, #2dd4bf 100%);
+    color: white;
+    padding: 48px 24px 56px;
+    margin-bottom: 32px;
+  }
+  header.hero .inner { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  header.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -0.4px; font-weight: 800; }
+  header.hero p  { margin: 0; opacity: 0.92; font-size: 15px; }
+  header.hero .badges { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  header.hero .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.28);
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.4px;
+  }
+  header.hero .repo { margin-top: 14px; font-size: 13px; }
+  header.hero .repo a { color: #fff; text-decoration: underline; opacity: 0.95; }
+
+  /* ── Section chrome ─────────────────────────────────────────────────── */
+  section.block {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+  }
+  section.block h2 {
+    margin: 0 0 6px;
+    font-size: 19px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex; align-items: center; gap: 10px;
+  }
+  section.block h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #15524a, #2dd4bf);
+    color: white; border-radius: 8px;
+    font-size: 12px; font-weight: 800;
+  }
+  section.block h3 {
+    margin: 22px 0 8px; font-size: 14px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.7px; color: #475569;
+  }
+  section.block p, section.block ul, section.block ol { margin: 8px 0; color: #334155; }
+  section.block ul, section.block ol { padding-left: 20px; }
+  section.block ul li, section.block ol li { margin: 4px 0; }
+  section.block strong { color: #0f172a; }
+
+  /* ── Code + pre ─────────────────────────────────────────────────────── */
+  code {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    color: #15524a;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 12px 0 18px;
+  }
+  pre code { background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit; }
+  pre.diagram { background: #f8fafc; color: #0f172a; border: 1px solid #e2e8f0; }
+
+  /* ── Tables ─────────────────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13.5px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+  }
+  thead {
+    background: linear-gradient(180deg, #f1f5f9, #e2e8f0);
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #475569;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  td {
+    padding: 10px 14px;
+    border-top: 1px solid #f1f5f9;
+    vertical-align: top;
+    color: #334155;
+  }
+  tbody tr:hover { background: #f8fafc; }
+  td code { font-size: 12px; }
+
+  /* ── TOC ────────────────────────────────────────────────────────────── */
+  nav.toc {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+  }
+  nav.toc h2 {
+    margin: 0 0 12px; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: #475569; font-weight: 800;
+  }
+  nav.toc ol {
+    columns: 2; column-gap: 32px; padding: 0;
+    list-style-position: inside;
+    font-size: 13.5px;
+  }
+  nav.toc ol li { margin: 4px 0; break-inside: avoid; }
+  nav.toc a { color: #15524a; text-decoration: none; font-weight: 600; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* ── Callouts ───────────────────────────────────────────────────────── */
+  .callout {
+    border-left: 4px solid;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  .callout.warn { border-color: #f59e0b; background: #fffbeb; color: #78350f; }
+  .callout.info { border-color: #0ea5e9; background: #f0f9ff; color: #0c4a6e; }
+  .callout.ok   { border-color: #10b981; background: #f0fdf4; color: #064e3b; }
+
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li {
+    position: relative; padding-left: 26px; margin: 6px 0;
+  }
+  .checklist li::before {
+    content: ""; position: absolute; left: 0; top: 4px;
+    width: 16px; height: 16px;
+    border: 1.5px solid #94a3b8; border-radius: 3px;
+    background: white;
+  }
+
+  footer.foot {
+    text-align: center; padding: 30px 0 10px; color: #64748b; font-size: 12px;
+  }
+
+  /* ── Print ──────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; font-size: 11pt; }
+    header.hero {
+      background: #15524a !important; -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    section.block, nav.toc { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+    pre { background: #f8fafc !important; color: #0f172a !important; border: 1px solid #cbd5e1; }
+    a { color: #15524a !important; text-decoration: none; }
+    nav.toc ol { columns: 1; }
+  }
+
+  /* ── Responsive ─────────────────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    section.block { padding: 22px 18px; }
+    nav.toc ol { columns: 1; }
+    header.hero h1 { font-size: 24px; }
+    pre { font-size: 11.5px; }
+    table { font-size: 12px; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <h1>DataVerse Collab — Deployment Handoff</h1>
+    <p>CAD / engineering collaboration platform · production deployment guide for the infrastructure team</p>
+    <div class="badges">
+      <span class="badge">Next.js 14</span>
+      <span class="badge">FastAPI</span>
+      <span class="badge">PostgreSQL 16</span>
+      <span class="badge">TypeScript</span>
+      <span class="badge">Python 3.11</span>
+    </div>
+    <p class="repo"><strong>Repo:</strong> <a href="https://github.com/ratnapriya-collab/Dataverse_collab_platform" target="_blank">github.com/ratnapriya-collab/Dataverse_collab_platform</a> · <strong>Branch:</strong> <code style="color:#fff;background:rgba(0,0,0,0.18);border:0">main</code></p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ── Table of contents ─────────────────────────────────────────────── -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#arch">Architecture at a glance</a></li>
+    <li><a href="#runtime">Runtime requirements</a></li>
+    <li><a href="#frontend">Frontend stack</a></li>
+    <li><a href="#backend">Backend stack</a></li>
+    <li><a href="#db">Database schema</a></li>
+    <li><a href="#network">Network &amp; ports</a></li>
+    <li><a href="#env">Environment variables</a></li>
+    <li><a href="#build">Build &amp; run commands</a></li>
+    <li><a href="#security">Security checklist</a></li>
+    <li><a href="#health">Health check &amp; smoke test</a></li>
+    <li><a href="#repo">Repo layout</a></li>
+    <li><a href="#contacts">Contacts</a></li>
+  </ol>
+</nav>
+
+<!-- ── 1. Architecture ────────────────────────────────────────────────── -->
+<section class="block" id="arch">
+  <h2><span class="num">1</span> Architecture at a glance</h2>
+  <p>Three-tier web app. Browser ↔ Next.js (SSR + static + client JS) ↔ FastAPI (REST + JWT) ↔ PostgreSQL. Frontend and backend deploy as two independent services; either can be horizontally scaled behind a load balancer.</p>
+<pre class="diagram">
+┌──────────────────────────────────┐         ┌──────────────────────────────────┐
+│  BROWSER                         │         │                                  │
+│  (modern Chrome / Edge /         │         │                                  │
+│   Firefox / Safari)              │         │                                  │
+│                                  │         │                                  │
+│  Next.js 14 (App Router) SSR/SPA │ ◄─────► │  FastAPI (Python 3.11)           │
+│   · React 18                     │  HTTPS  │   · uvicorn ASGI server          │
+│   · TypeScript (strict)          │  +JWT   │   · SQLModel ORM                 │
+│   · Tailwind CSS                 │  REST   │   · Alembic migrations           │
+│   · Zustand state mgmt           │   JSON  │   · python-jose JWT auth         │
+│   · Babylon.js 8 (3D viewer)     │         │                                  │
+│   · @react-pdf/renderer          │         │  Listens on :4000                │
+│   · html2canvas                  │         │                                  │
+│                                  │         │                                  │
+│  Listens on :3010 (dev)          │         │                                  │
+│  Listens on :80/443 (prod)       │         │                                  │
+└──────────────────────────────────┘         └────────────┬─────────────────────┘
+                                                          │
+                                                          │ psycopg2 over :5432
+                                                          ▼
+                                              ┌──────────────────────────┐
+                                              │  PostgreSQL 16           │
+                                              │   · users · parts        │
+                                              │   · anchors · decisions  │
+                                              │   · threads · replies    │
+                                              │   · captures (BYTEA)     │
+                                              │   · events (audit log)   │
+                                              │                          │
+                                              │  Recommended: AWS RDS    │
+                                              │  for production          │
+                                              └──────────────────────────┘
+</pre>
+</section>
+
+<!-- ── 2. Runtime ─────────────────────────────────────────────────────── -->
+<section class="block" id="runtime">
+  <h2><span class="num">2</span> Runtime requirements</h2>
+  <table>
+    <thead><tr><th>Component</th><th>Version</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Node.js</strong></td><td>20.x LTS</td><td>Not 22 (Next.js 14 not validated on 22). Ships with npm 10.x.</td></tr>
+      <tr><td><strong>Python</strong></td><td>3.11.x</td><td>Code targets <code>py311</code> per ruff config. 3.12+ works but not validated.</td></tr>
+      <tr><td><strong>PostgreSQL</strong></td><td>16.x</td><td>15 also works. Migrations use <code>BYTEA</code>, <code>JSONB</code>, <code>timestamptz</code>.</td></tr>
+      <tr><td><strong>OS</strong></td><td>Linux (Ubuntu 22.04 / Amazon Linux 2023) <em>or</em> Windows Server 2019+</td><td>Headless server, no GUI needed.</td></tr>
+      <tr><td><strong>Memory</strong></td><td>4 GB min · 8 GB+ recommended</td><td>Next.js build needs ~2 GB transient.</td></tr>
+      <tr><td><strong>CPU</strong></td><td>2 vCPU min · 4+ recommended</td><td>AWS t3.large or t3.xlarge sweet spot.</td></tr>
+      <tr><td><strong>Disk</strong></td><td>20 GB min</td><td>App ~500 MB; rest is logs + uploaded CAD files + DB growth.</td></tr>
+      <tr><td><strong>Network</strong></td><td>Inbound 80/443 (or 3010/4000 direct)</td><td>See Section 6.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 3. Frontend ────────────────────────────────────────────────────── -->
+<section class="block" id="frontend">
+  <h2><span class="num">3</span> Frontend stack <code>dataverse-collab/frontend/</code></h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Package</th><th>Version</th></tr></thead>
+    <tbody>
+      <tr><td>Framework</td><td><code>next</code></td><td>14.2.33 (App Router)</td></tr>
+      <tr><td>UI runtime</td><td><code>react</code>, <code>react-dom</code></td><td>18.3.1</td></tr>
+      <tr><td>Language</td><td><code>typescript</code></td><td>5.5.3 (strict mode)</td></tr>
+      <tr><td>Styling</td><td><code>tailwindcss</code> · <code>postcss</code> · <code>autoprefixer</code></td><td>3.4.6 / 8.4.39 / 10.4.19</td></tr>
+      <tr><td>State management</td><td><code>zustand</code></td><td>^4.5.0</td></tr>
+      <tr><td>3D viewer</td><td><code>@babylonjs/core</code> · <code>loaders</code> · <code>materials</code></td><td>^8.0.0</td></tr>
+      <tr><td>CAD geometry kernel</td><td><code>opencascade.js</code></td><td>2.0.0-beta</td></tr>
+      <tr><td>PDF generation</td><td><code>@react-pdf/renderer</code></td><td>^4.5.1</td></tr>
+      <tr><td>DOM-to-image</td><td><code>html2canvas</code></td><td>^1.4.1</td></tr>
+      <tr><td>Icons</td><td><code>lucide-react</code></td><td>^0.469.0</td></tr>
+      <tr><td>Linting</td><td><code>eslint</code> · <code>eslint-config-next</code></td><td>8.57.0 / 14.2.33</td></tr>
+      <tr><td>Testing</td><td><code>vitest</code></td><td>2.1.4</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Build output:</strong> <code>frontend/.next/</code> directory. <code>npm start</code> serves it in production mode.</p>
+</section>
+
+<!-- ── 4. Backend ─────────────────────────────────────────────────────── -->
+<section class="block" id="backend">
+  <h2><span class="num">4</span> Backend stack <code>dataverse-collab/backend/</code></h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Package</th><th>Version</th></tr></thead>
+    <tbody>
+      <tr><td>Web framework</td><td><code>fastapi</code></td><td>0.115.0</td></tr>
+      <tr><td>ASGI server</td><td><code>uvicorn[standard]</code></td><td>0.30.6 (httptools + uvloop on Linux)</td></tr>
+      <tr><td>ORM</td><td><code>sqlmodel</code> (wraps SQLAlchemy)</td><td>0.0.22</td></tr>
+      <tr><td>Schema migrations</td><td><code>alembic</code></td><td>1.13.3</td></tr>
+      <tr><td>Validation</td><td><code>pydantic</code> · <code>pydantic-settings</code></td><td>2.9.2 / 2.5.2</td></tr>
+      <tr><td>Postgres driver</td><td><code>psycopg2-binary</code></td><td>2.9.10</td></tr>
+      <tr><td>JWT auth</td><td><code>python-jose[cryptography]</code></td><td>3.3.0 (HS256)</td></tr>
+      <tr><td>Password hashing</td><td><code>passlib[bcrypt]</code> · <code>bcrypt</code></td><td>1.7.4 / 4.2.0</td></tr>
+      <tr><td>Multipart uploads</td><td><code>python-multipart</code></td><td>0.0.12</td></tr>
+      <tr><td>Email validation</td><td><code>email-validator</code></td><td>2.2.0</td></tr>
+      <tr><td>Linting</td><td><code>ruff</code></td><td>configured in <code>pyproject.toml</code>, target <code>py311</code></td></tr>
+      <tr><td>Testing</td><td><code>pytest</code> · <code>pytest-asyncio</code> · <code>httpx</code> · <code>anyio</code></td><td>8.3.3 / 0.24.0 / 0.27.2 / 4.6.0</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Entrypoint:</strong> <code>app.main:app</code> (FastAPI factory in <code>backend/app/main.py</code>)<br />
+  <strong>Run:</strong> <code>uvicorn app.main:app --host 0.0.0.0 --port 4000</code></p>
+</section>
+
+<!-- ── 5. Database ────────────────────────────────────────────────────── -->
+<section class="block" id="db">
+  <h2><span class="num">5</span> Database schema</h2>
+  <p><strong>Schema authority:</strong> Alembic. <strong>Never</strong> auto-create tables in production — always migrate.</p>
+  <table>
+    <thead><tr><th>Table</th><th>Purpose</th><th>Notable columns</th></tr></thead>
+    <tbody>
+      <tr><td><code>users</code></td><td>Accounts</td><td>email (unique), password_hash (bcrypt), role enum</td></tr>
+      <tr><td><code>parts</code></td><td>Uploaded CAD files (STEP / GLB)</td><td>file_path, content_hash, owner_id FK</td></tr>
+      <tr><td><code>anchors</code></td><td>Face-anchor records on a part</td><td>face_uuid, centroid xyz</td></tr>
+      <tr><td><code>decisions</code></td><td>Engineering decisions</td><td>state (DRAFT/PROPOSED/ACCEPTED/REJECTED/SUPERSEDED), anchor_id, rationale</td></tr>
+      <tr><td><code>threads</code></td><td>v2 comment threads</td><td>face_uuid, status, priority, assignee, JSONB tags</td></tr>
+      <tr><td><code>replies</code></td><td>Messages in threads</td><td>body, JSONB mentions, JSONB reactions</td></tr>
+      <tr><td><code>captures</code></td><td>Persistent 3D viewer screenshots</td><td>image_bytes BYTEA, image_mime, JSONB camera_state, sort_order</td></tr>
+      <tr><td><code>events</code></td><td>Append-only audit log</td><td>every mutation logged for the audit page</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Migrations applied through <code>0006_captures</code>.</strong> Run with:</p>
+<pre><code>cd backend &amp;&amp; alembic upgrade head</code></pre>
+  <div class="callout info">
+    <strong>Image storage note:</strong> Capture screenshots stored as <code>BYTEA</code> in Postgres. Demo-scale (~30 captures × 150&nbsp;KB JPEG ≈ 4&nbsp;MB per part) is fine. For 100× scale, swap <code>image_bytes</code> for an object-store key (S3) — public API unchanged.
+  </div>
+</section>
+
+<!-- ── 6. Network ─────────────────────────────────────────────────────── -->
+<section class="block" id="network">
+  <h2><span class="num">6</span> Network &amp; ports</h2>
+  <h3>Inbound (open in firewall + security group)</h3>
+  <table>
+    <thead><tr><th>Port</th><th>Service</th><th>Protocol</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td><code>443</code></td><td>HTTPS (recommended in front of both)</td><td>TCP</td><td><code>0.0.0.0/0</code></td></tr>
+      <tr><td><code>80</code></td><td>HTTP → HTTPS redirect</td><td>TCP</td><td><code>0.0.0.0/0</code></td></tr>
+      <tr><td><code>3010</code></td><td>Next.js direct (if no reverse proxy)</td><td>TCP</td><td>Restrict to office IPs or behind ALB</td></tr>
+      <tr><td><code>4000</code></td><td>FastAPI direct (if no reverse proxy)</td><td>TCP</td><td>Restrict to office IPs or behind ALB</td></tr>
+      <tr><td><code>5432</code></td><td>PostgreSQL</td><td>TCP</td><td><strong>Only</strong> from app-server security group — <strong>never</strong> <code>0.0.0.0/0</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Outbound</h3>
+  <ul>
+    <li><code>443</code> to <code>pypi.org</code> and <code>registry.npmjs.org</code> for dep installs</li>
+    <li><code>443</code> to <code>github.com</code> for <code>git clone</code> / <code>git pull</code></li>
+    <li><code>443</code> to the DB host if RDS lives in a different VPC subnet</li>
+  </ul>
+
+  <h3>Recommended production fronting</h3>
+  <ul>
+    <li><strong>AWS ALB</strong> (or nginx / Caddy) on <code>:80/:443</code> with an ACM cert</li>
+    <li>Route <code>/api/*</code> → backend <code>:4000</code></li>
+    <li>Route everything else → frontend <code>:3010</code></li>
+    <li>Or split subdomains: <code>app.dataverse.example.com</code> → frontend, <code>api.dataverse.example.com</code> → backend</li>
+  </ul>
+</section>
+
+<!-- ── 7. Env ─────────────────────────────────────────────────────────── -->
+<section class="block" id="env">
+  <h2><span class="num">7</span> Environment variables</h2>
+
+  <h3>Backend — <code>backend/.env</code></h3>
+<pre><code># Application
+APP_NAME=DataVerse Collab API
+ENV=production
+LOG_LEVEL=INFO
+
+# Database — pick ONE
+DATABASE_URL=postgresql+psycopg2://dataverse:STRONG_PASSWORD@db-host:5432/dataverse
+# (dev fallback: DATABASE_URL=sqlite:///./dataverse.db)
+
+# JWT — MUST be a long random string in prod;
+# MUST be identical across all backend instances if scaled horizontally
+JWT_SECRET=replace-with-cryptographically-random-32+-character-string
+JWT_ALGORITHM=HS256
+JWT_EXPIRES_MINUTES=10080
+
+# CORS — comma-separated list of allowed frontend origins
+FRONTEND_ORIGINS=https://app.dataverse.example.com</code></pre>
+
+  <h3>Frontend — <code>frontend/.env.local</code></h3>
+<pre><code># Public — bundled into the JS sent to browsers.
+# Must point at the backend URL the END USER's browser can reach
+# (not "localhost" unless the user is on the server).
+NEXT_PUBLIC_API_BASE_URL=https://api.dataverse.example.com</code></pre>
+
+  <h3>Required production secrets</h3>
+  <ul>
+    <li><code>JWT_SECRET</code> — generate with <code>openssl rand -base64 64</code></li>
+    <li>Postgres <code>dataverse</code> user password</li>
+    <li>Postgres <code>postgres</code> superuser password (only used during initial DB setup)</li>
+  </ul>
+</section>
+
+<!-- ── 8. Build ───────────────────────────────────────────────────────── -->
+<section class="block" id="build">
+  <h2><span class="num">8</span> Build &amp; run commands</h2>
+
+  <h3>One-time setup (per deploy)</h3>
+<pre><code># Clone
+git clone https://github.com/ratnapriya-collab/Dataverse_collab_platform.git
+cd Dataverse_collab_platform
+
+# Backend
+cd dataverse-collab/backend
+python -m venv .venv
+source .venv/bin/activate                # Linux
+# or: .\.venv\Scripts\Activate.ps1       # Windows
+pip install -r requirements.txt
+# Configure backend/.env (see Section 7)
+alembic upgrade head                     # runs DB migrations
+
+# Frontend
+cd ../frontend
+npm ci                                   # use ci, not install, in production
+# Configure frontend/.env.local (see Section 7)
+npm run build                            # produces .next/ directory</code></pre>
+
+  <h3>Run</h3>
+<pre><code># Backend — port 4000
+cd dataverse-collab/backend
+source .venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 4000 --workers 2
+
+# Frontend — port 3010, production mode
+cd dataverse-collab/frontend
+npm start -- -H 0.0.0.0 -p 3010</code></pre>
+
+  <h3>Recommended process supervision</h3>
+  <table>
+    <thead><tr><th>OS</th><th>Tool</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Linux</td><td><code>systemd</code> units (one per process)</td><td>survives reboot, auto-restart, journald logs</td></tr>
+      <tr><td>Windows Server</td><td><a href="https://nssm.cc" target="_blank">NSSM</a> wrapping each command</td><td>survives reboot AND RDP disconnect</td></tr>
+      <tr><td>Containers</td><td>Docker + docker-compose · ECS / EKS</td><td>best for horizontal scale</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    The repo doesn't ship Dockerfiles or systemd units yet — those should be added during deployment hardening.
+  </div>
+</section>
+
+<!-- ── 9. Security ────────────────────────────────────────────────────── -->
+<section class="block" id="security">
+  <h2><span class="num">9</span> Security checklist for production</h2>
+  <ul class="checklist">
+    <li><code>JWT_SECRET</code> is <strong>cryptographically random</strong>, not the default in <code>.env.example</code></li>
+    <li>DB password is <strong>strong</strong> and <strong>not in git history</strong></li>
+    <li>Postgres <code>:5432</code> is <strong>not reachable from the public internet</strong> — only from app servers</li>
+    <li>Frontend served over <strong>HTTPS</strong> (ACM cert via ALB, or Caddy / Let's Encrypt)</li>
+    <li><code>FRONTEND_ORIGINS</code> in backend <code>.env</code> lists <strong>only your real frontend origin(s)</strong>, not <code>*</code></li>
+    <li>Regular <strong>DB backups</strong> — RDS automated snapshots, or <code>pg_dump</code> on cron</li>
+    <li><strong>CORS</strong> allowed origins reviewed</li>
+    <li><strong>Rate limiting</strong> in front of <code>/api/*</code> (ALB rules, Cloudflare, or middleware)</li>
+    <li><strong>Server access logs</strong> captured to CloudWatch / log aggregation</li>
+    <li><strong>OS patching cadence</strong> for the EC2 / VM established</li>
+  </ul>
+</section>
+
+<!-- ── 10. Health ─────────────────────────────────────────────────────── -->
+<section class="block" id="health">
+  <h2><span class="num">10</span> Health check &amp; smoke test</h2>
+  <p>After deploy, hit these:</p>
+  <table>
+    <thead><tr><th>Check</th><th>Expected</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>GET https://api.host/health</code></td>
+        <td><code>200 {"status":"ok","db_connected":true}</code></td>
+        <td>ALB / monitoring</td>
+      </tr>
+      <tr>
+        <td><code>GET https://app.host/</code></td>
+        <td>200 HTML, "DataVerse" branding visible</td>
+        <td>smoke test</td>
+      </tr>
+      <tr>
+        <td>Register user → log in → upload a small <code>.step</code> file → take a Capture View screenshot → reload page</td>
+        <td>Screenshot persists across reload</td>
+        <td>End-to-end</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 11. Repo layout ────────────────────────────────────────────────── -->
+<section class="block" id="repo">
+  <h2><span class="num">11</span> Repo layout</h2>
+<pre class="diagram">Dataverse_collab_platform/
+└── dataverse-collab/
+    ├── frontend/                # Next.js app
+    │   ├── src/app/             # App Router pages
+    │   ├── src/components/      # React components
+    │   ├── src/features/        # Feature modules (capture, comments, …)
+    │   ├── src/_viewer/         # Babylon.js 3D viewer (self-contained)
+    │   ├── src/lib/             # API client, auth, utils
+    │   ├── package.json
+    │   └── .env.local           # (you create this)
+    └── backend/                 # FastAPI app
+        ├── app/
+        │   ├── main.py          # entrypoint — uvicorn app.main:app
+        │   ├── config.py        # env-var loader
+        │   ├── database.py      # SQLAlchemy engine + session
+        │   ├── models/          # SQLModel table classes
+        │   ├── schemas/         # Pydantic request/response shapes
+        │   ├── routes/          # FastAPI route modules
+        │   ├── core/            # security primitives (JWT, file tokens)
+        │   └── utils/           # auth dep, event logger, storage
+        ├── alembic/
+        │   ├── env.py
+        │   └── versions/        # migration files 0001 → 0006
+        ├── requirements.txt
+        ├── pyproject.toml       # ruff + pytest config
+        └── .env                 # (you create this)</pre>
+</section>
+
+<!-- ── 12. Contacts ───────────────────────────────────────────────────── -->
+<section class="block" id="contacts">
+  <h2><span class="num">12</span> Contacts / ownership</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Name / Identifier</th></tr></thead>
+    <tbody>
+      <tr><td>Product owner</td><td>Ratnapriya Chamala</td></tr>
+      <tr><td>Repo admin</td><td><code>ratnapriya-collab</code> (GitHub org)</td></tr>
+      <tr><td>Primary contact email</td><td><a href="mailto:ratnapriyachamala41@gmail.com">ratnapriyachamala41@gmail.com</a></td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok">
+    Deployment team should be unblocked to provision infra and run through Section 8. For any questions on architecture trade-offs (e.g. moving image bytes to S3, switching DB to RDS, scaling out behind an ALB), contact the product owner.
+  </div>
+</section>
+
+<footer class="foot">
+  Generated for DataVerse Collab deployment handoff · open this file in any browser · Ctrl+P to export as PDF
+</footer>
+
+</div>
+</body>
+</html>

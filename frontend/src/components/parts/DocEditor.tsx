@@ -54,6 +54,7 @@ import {
   Plus,
   Printer,
   Redo2,
+  Shapes,
   Sparkles,
   Strikethrough,
   Type,
@@ -63,6 +64,7 @@ import {
 } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import type { SummarizeDocumentResponse } from '@/types/api'
+import ShapesIconsPicker from './ShapesIconsPicker'
 
 interface DocTab {
   id: string
@@ -124,6 +126,8 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
   const [highlightColor, setHighlightColor] = useState('#fde68a')
   const [showStyles, setShowStyles] = useState(false)
   const [showFonts, setShowFonts] = useState(false)
+  // Shapes/Arrows/Icons picker — popover anchored next to the toolbar button.
+  const [showShapesPicker, setShowShapesPicker] = useState(false)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   // Datum AI · Hook 6 · Summarize Document
@@ -168,14 +172,57 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
     node.innerHTML = readDoc(partId, activeTabId)
   }, [partId, activeTabId])
 
-  /** Run an execCommand and refocus the editor so the toolbar doesn't steal focus. */
-  const exec = useCallback((command: string, value?: string) => {
+  /**
+   * Selection persistence — fixes a contentEditable gotcha. When the user
+   * clicks the native color picker, focus moves to the input element and
+   * the editor's text selection is lost. By the time onChange fires there's
+   * no Range to apply the color to. We capture the Range whenever the
+   * editor's selection changes (or just before a focus-stealing toolbar
+   * action) and restore it inside exec() before document.execCommand runs.
+   */
+  const savedRangeRef = useRef<Range | null>(null)
+
+  const saveSelection = useCallback(() => {
     const node = editorRef.current
     if (node === null) return
-    node.focus()
-    document.execCommand(command, false, value)
-    persist()
+    const sel = window.getSelection()
+    if (sel === null || sel.rangeCount === 0) return
+    const range = sel.getRangeAt(0)
+    // Only save selections that are INSIDE the editor — otherwise we'd
+    // restore a stale selection from somewhere else on the page.
+    if (node.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange()
+    }
   }, [])
+
+  const restoreSelection = useCallback(() => {
+    const node = editorRef.current
+    const saved = savedRangeRef.current
+    if (node === null || saved === null) return false
+    node.focus()
+    const sel = window.getSelection()
+    if (sel === null) return false
+    sel.removeAllRanges()
+    sel.addRange(saved)
+    return true
+  }, [])
+
+  /** Run an execCommand. Re-uses the saved selection (if any) so colour /
+   * font / background commands hit the right text even when the picker
+   * stole focus before the user confirmed. */
+  const exec = useCallback(
+    (command: string, value?: string) => {
+      const node = editorRef.current
+      if (node === null) return
+      // If we have a saved range (color/highlight pickers set this on
+      // mousedown), restore it before the command. Otherwise just focus.
+      const restored = restoreSelection()
+      if (!restored) node.focus()
+      document.execCommand(command, false, value)
+      persist()
+    },
+    [restoreSelection],
+  )
 
   /** Debounced-ish autosave — write current HTML to localStorage. */
   const persist = useCallback(() => {
@@ -205,6 +252,19 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
     const url = window.prompt('Link URL')
     if (url === null || url.trim() === '') return
     exec('createLink', url.trim())
+  }
+
+  /** Insert a shape/arrow/icon SVG at the cursor.
+   *
+   * Wraps the raw SVG string in a non-breaking space pair so the user's
+   * caret lands AFTER the inserted figure (browsers otherwise leave the
+   * caret stuck inside the SVG, which feels like the editor froze). */
+  const handleShapeInsert = (svg: string): void => {
+    setShowShapesPicker(false)
+    // The leading zero-width space gives the cursor a place to live just
+    // before the SVG (so the caret position is sensible after insert) and
+    // the trailing &nbsp; gives it a printable place to land after.
+    exec('insertHTML', `${svg}&nbsp;`)
   }
 
   const handleFontSize = (delta: number): void => {
@@ -376,10 +436,12 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
 
         <Separator />
 
-        {/* Text color */}
+        {/* Text color — snapshot selection on mousedown BEFORE the native
+            picker steals focus from the contentEditable. exec() restores it. */}
         <label
           className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded hover:bg-slate-100"
           title="Text color"
+          onMouseDown={saveSelection}
         >
           <Type className="h-4 w-4" style={{ color: textColor }} />
           <input
@@ -393,10 +455,11 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
           />
         </label>
 
-        {/* Highlight color */}
+        {/* Highlight color — same trick. */}
         <label
           className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded hover:bg-slate-100"
           title="Highlight color"
+          onMouseDown={saveSelection}
         >
           <Highlighter className="h-4 w-4 text-slate-700" />
           <span
@@ -432,6 +495,46 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
             onChange={handleImageInsert}
             className="sr-only"
           />
+
+          {/* Insert shape / arrow / icon — opens a popover with three tabs.
+              We snapshot the selection on mousedown so opening the picker
+              doesn't lose the user's cursor position. */}
+          <div className="relative">
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                // Save selection BEFORE the toolbar takes focus, otherwise
+                // execCommand on insert lands at the wrong spot.
+                saveSelection()
+                // Don't let the click steal focus from the contentEditable.
+                e.preventDefault()
+              }}
+              onClick={() => {
+                // Open-only. Closing is handled by outside-click / Esc /
+                // footer Close inside the picker. (A toggle here would race
+                // the picker's capture-phase outside-click handler and
+                // immediately re-open the popover.)
+                if (!showShapesPicker) setShowShapesPicker(true)
+              }}
+              aria-label="Insert shape, arrow, or icon"
+              aria-expanded={showShapesPicker}
+              title="Insert shape, arrow, or icon"
+              className={[
+                'inline-flex h-7 w-7 items-center justify-center rounded transition',
+                showShapesPicker
+                  ? 'bg-primary-50 text-primary'
+                  : 'text-slate-600 hover:bg-slate-100',
+              ].join(' ')}
+            >
+              <Shapes className="h-4 w-4" />
+            </button>
+            {showShapesPicker && (
+              <ShapesIconsPicker
+                onInsert={handleShapeInsert}
+                onClose={() => setShowShapesPicker(false)}
+              />
+            )}
+          </div>
         </ToolGroup>
 
         <Separator />
@@ -553,7 +656,13 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
             ref={editorRef}
             contentEditable
             suppressContentEditableWarning
-            onInput={persist}
+            onInput={() => {
+              // Typing invalidates any saved range (the user moved on).
+              savedRangeRef.current = null
+              persist()
+            }}
+            onMouseUp={saveSelection}
+            onKeyUp={saveSelection}
             onMouseDown={(e) => {
               // Stop the editor from losing focus on toolbar click sequences.
               if ((e.target as HTMLElement).closest?.('[data-toolbar]') !== null) e.preventDefault()

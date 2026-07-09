@@ -12,9 +12,9 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { Box, ChevronDown, FileEdit, FileText, ListTree } from 'lucide-react'
+import { Box, ChevronDown, FileEdit, FileText, ListTree, Sparkles } from 'lucide-react'
 
-export type PartView = '3d' | '2d' | 'bom' | 'doc'
+export type PartView = '3d' | '2d' | 'bom' | 'doc' | 'pro'
 
 interface Props {
   partId: string
@@ -59,6 +59,17 @@ const TABS: TabSpec[] = [
     href: (id) => `/parts/${id}/doc`,
     icon: FileEdit,
     hint: 'Design notes & spec',
+  },
+  {
+    // Pro Viewer — embeds the dv-3d-viewer (Datavers.ai). Full BREP feature
+    // set: measurement, section caps, face picker, compare mode, walkthroughs.
+    // Currently rendered via iframe (dev: localhost:5173, prod: static build
+    // copied to public/dv-viewer/) — see app/parts/[id]/pro-viewer/page.tsx.
+    id: 'pro',
+    label: 'Pro Viewer',
+    href: (id) => `/parts/${id}/pro-viewer`,
+    icon: Sparkles,
+    hint: 'Measurement · sections · compare',
   },
 ]
 

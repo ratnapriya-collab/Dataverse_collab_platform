@@ -17,7 +17,7 @@
  */
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -91,6 +91,19 @@ interface Props {
 
   // v2 commenting (CommentsPanel) — user identity for thread authorship.
   currentUser: { id: string; name: string }
+
+  /**
+   * Optional anchor passed straight through to CommentsPanel — when
+   * present, the inline compose textarea appears in the Comments tab
+   * tied to this face. Used by the Pro Viewer page: when the iframe
+   * (dv-3d-viewer) fires a face-pick event over postMessage, we want
+   * the host's Comments tab to surface the composer for that face.
+   *
+   * The regular /parts/[id] page passes nothing here and relies on its
+   * own CreateDecisionModal flow (Decisions, not v2 threads). Optional
+   * so that page stays unaffected.
+   */
+  composeAnchor?: { faceUuid: string; centroid: { x: number; y: number; z: number } } | null
 }
 
 export default function PartConversationHub({
@@ -112,8 +125,17 @@ export default function PartConversationHub({
   screenSignal,
   reasonFor,
   currentUser,
+  composeAnchor = null,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<HubTab>('comments')
+
+  // When a face-anchored composer is requested by the parent (Pro Viewer's
+  // postMessage bridge fires this), snap to the Comments tab so the user
+  // sees the inline composer right away instead of staying on whichever
+  // tab they were viewing.
+  useEffect(() => {
+    if (composeAnchor !== null) setTab('comments')
+  }, [composeAnchor])
 
   // ── Derived counts for tab badges ─────────────────────────────────
   const openCount = useMemo(
@@ -243,7 +265,7 @@ export default function PartConversationHub({
             partId={partId}
             partName={partName}
             currentUser={currentUser}
-            composeAnchor={null}
+            composeAnchor={composeAnchor}
           />
         )}
         {tab === 'issues' && <IssuesTabBody partId={partId} rows={issueRows} />}

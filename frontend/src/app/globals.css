@@ -158,6 +158,307 @@ body {
   }
 }
 
+/* ── Doc-editor inline chips (mentions / tags / parts) ────────────────────
+   Small pill-shaped inline elements that flow with text but read as
+   linked data. Rendered from the DocEditor pickers and persisted in the
+   doc's HTML so they survive reload. */
+.dv-mention,
+.dv-tag-chip,
+.dv-part-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border: 1px solid transparent;
+}
+/* @mention — soft primary teal */
+.dv-mention {
+  background: rgba(21, 82, 74, 0.08);
+  border-color: rgba(21, 82, 74, 0.20);
+  color: #0f4a42;
+  cursor: default;
+}
+/* #tag chip — colour by category via data-category */
+.dv-tag-chip { background: #f1f5f9; border-color: #e2e8f0; color: #334155; }
+.dv-tag-chip[data-category="tool"]      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.dv-tag-chip[data-category="procedure"] { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; }
+.dv-tag-chip[data-category="torque"]    { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.dv-tag-chip[data-category="material"]  { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.dv-tag-chip[data-category="standard"]  { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+/* Part number chip — always the same teal so it stands out from tags */
+.dv-part-chip {
+  background: rgba(21, 82, 74, 0.06);
+  border-color: rgba(21, 82, 74, 0.30);
+  color: #0f4a42;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+/* ── Image annotation (pencil markup) ─────────────────────────────────────
+   Every image inserted into the doc gets wrapped in a `.dv-annotatable`
+   container that layers an SVG overlay on top for pencil strokes. The
+   overlay is `pointer-events: none` by default so the image behaves
+   normally; when the parent editor toggles `data-annotate-mode="on"`,
+   the overlay flips to `pointer-events: auto` and captures pointer
+   drags for freehand drawing. */
+.dv-annotatable {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  line-height: 0;             /* image sits flush with wrapper edges */
+  user-select: none;
+}
+.dv-annotatable > img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.dv-annotations {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.dv-annotations path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[data-annotate-mode="on"] .dv-annotations {
+  pointer-events: auto !important;
+  cursor: crosshair !important;
+  touch-action: none;
+  z-index: 5;
+}
+[data-annotate-mode="on"] .dv-annotatable {
+  outline: 3px solid #15524a;
+  outline-offset: 2px;
+  /* Wrapper itself never absorbs pointer events — let the SVG (a
+     later sibling with explicit auto + z-index) be the sole target. */
+  pointer-events: none;
+}
+/* Force the underlying <img> to stop capturing pointer events while
+   annotate mode is on. Without this, Chrome's <img> element intercepts
+   clicks before the overlaid SVG can, which is the classic "pencil
+   button turns on but drawing does nothing" symptom. */
+[data-annotate-mode="on"] .dv-annotatable > img {
+  pointer-events: none !important;
+}
+[data-annotate-mode="on"] .dv-annotations {
+  pointer-events: auto !important;
+}
+/* Bare (un-wrapped) images get a hint outline too so it's obvious the
+   pencil applies to them. */
+[data-annotate-mode="on"] img:not(.dv-annotatable img):not(.dv-mention img):not(.dv-tag-chip img):not(.dv-part-chip img) {
+  outline: 2px dashed rgba(21, 82, 74, 0.35);
+  outline-offset: 2px;
+}
+
+/* ── Figure + caption + comment pins ─────────────────────────────────────
+   Images can be wrapped in a <figure class="dv-figure"> that holds an
+   optional editable <figcaption> and any number of absolutely-positioned
+   <span class="dv-image-pin"> markers. Structure is:
+
+     <figure class="dv-figure" contenteditable="false">
+       <span class="dv-annotatable">
+         <img />
+         <svg class="dv-annotations"> … pencil strokes … </svg>
+         <span class="dv-image-pin" data-pin-n="1" style="left:37%;top:22%">1</span>
+       </span>
+       <figcaption contenteditable="true">Apr 23, 2026 09:07 AM</figcaption>
+     </figure>
+*/
+.dv-figure {
+  display: inline-block;
+  margin: 8px 0;
+  padding: 0;
+  vertical-align: baseline;
+  line-height: 0;
+}
+.dv-figcaption {
+  display: block;
+  padding: 6px 4px 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+  text-align: center;
+  min-height: 20px;
+  outline: none;
+}
+.dv-figcaption:empty::before,
+.dv-figcaption[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #cbd5e1;
+  font-style: italic;
+}
+.dv-figcaption:hover {
+  background: rgba(15, 23, 42, 0.02);
+  border-radius: 4px;
+}
+.dv-figcaption:focus {
+  background: rgba(21, 82, 74, 0.04);
+  border-radius: 4px;
+  color: #0f172a;
+}
+
+/* Numbered comment pins that sit on top of an image. Positioned via
+   left/top percentages so they scale with the image on reflow. */
+.dv-image-pin {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4), 0 0 0 3px rgba(255, 255, 255, 0.9);
+  z-index: 4;
+  transition: transform 120ms ease;
+  pointer-events: auto;
+  user-select: none;
+}
+.dv-image-pin:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+/* While pin-drop is armed, every image in the editor gets a bright
+   red crosshair-cursor treatment so the user knows exactly where the
+   next click will land. The pencil-overlay SVG is forcibly disabled
+   so the click reaches the underlying img. */
+[data-pindrop-mode="on"] img {
+  cursor: crosshair !important;
+  outline: 3px dashed #dc2626 !important;
+  outline-offset: 2px !important;
+}
+[data-pindrop-mode="on"] .dv-annotatable {
+  cursor: crosshair !important;
+  outline: 3px dashed #dc2626 !important;
+  outline-offset: 2px !important;
+}
+[data-pindrop-mode="on"] .dv-annotations {
+  pointer-events: none !important;
+}
+
+/* Selection border for the hovered image — subtle blue outline so the
+   user always knows which image the context toolbar is targeting. */
+.dv-image-focused {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* On-screen banner shown whenever annotate mode is on. Bolts to the
+   bottom of the viewport so it's impossible to miss even if the picker
+   popover closed. */
+.dv-annotate-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #15524a;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(21, 82, 74, 0.35);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: dv-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.dv-annotate-banner::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+  animation: dv-pulse 1.2s ease-in-out infinite;
+}
+@keyframes dv-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.4); }
+}
+
+/* ── Doc-editor callout blocks ─────────────────────────────────────────────
+   Notion / Quarter20 style admonition boxes. Inserted via the toolbar
+   "Callout" picker. Styled via the shared .dv-callout class with a
+   variant on data-tone. Persisted as HTML in the doc so they round-trip. */
+.dv-callout {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  margin: 10px 0;
+  border-left: 4px solid;
+  border-radius: 6px;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+.dv-callout > .dv-callout-icon {
+  font-size: 1.15em;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+.dv-callout > .dv-callout-body { flex: 1; min-width: 0; }
+.dv-callout[data-tone="info"]    { background: #eff6ff; border-left-color: #2563eb; color: #1e3a8a; }
+.dv-callout[data-tone="success"] { background: #f0fdf4; border-left-color: #16a34a; color: #14532d; }
+.dv-callout[data-tone="warning"] { background: #fffbeb; border-left-color: #d97706; color: #78350f; }
+.dv-callout[data-tone="danger"]  { background: #fef2f2; border-left-color: #dc2626; color: #7f1d1d; }
+
+/* ── Doc-editor focus mode ────────────────────────────────────────────────
+   Toggled by the "Focus" toolbar button. Hides the tabs rail + toolbar +
+   template chips + menu bar; widens the editor for distraction-free
+   writing. Root selector is applied on the DocEditor's outer div. */
+.dv-doc-focus [data-doc-menu-bar],
+.dv-doc-focus [data-doc-toolbar],
+.dv-doc-focus [data-doc-tabs-rail],
+.dv-doc-focus [data-doc-chips-row],
+.dv-doc-focus [data-doc-page-header] {
+  display: none !important;
+}
+.dv-doc-focus [data-doc-canvas] {
+  padding-top: 40px !important;
+}
+.dv-doc-focus [data-doc-editor] {
+  max-width: 720px !important;
+  margin: 0 auto !important;
+  font-size: 15px !important;
+  line-height: 1.75 !important;
+}
+
+/* ── Doc-editor print styles (Export → PDF via window.print) ──────────────
+   Strip all chrome so the printed page shows only the doc content. */
+@media print {
+  body * { visibility: hidden; }
+  [data-doc-editor], [data-doc-editor] * {
+    visibility: visible !important;
+  }
+  [data-doc-editor] {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Thin custom scrollbar — applied via .dv-thin-scroll on any scrollable
    element. Track is transparent so the surface beneath shows through.

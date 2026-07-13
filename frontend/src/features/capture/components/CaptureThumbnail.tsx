@@ -19,8 +19,10 @@
  */
 
 import { useState, type DragEvent } from 'react'
-import { GripVertical, History, Loader2, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { FileText, GripVertical, History, Loader2, Trash2 } from 'lucide-react'
 import type { Capture } from '../types/capture.types'
+import { appendImageToDoc } from '../lib/sendToDoc'
 
 interface Props {
   capture: Capture
@@ -58,12 +60,48 @@ export default function CaptureThumbnail({
   setDraggingIndex,
   draggingIndex,
 }: Props): JSX.Element {
+  const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(capture.caption)
+  // Local "sending to doc" state — drives the button spinner and the
+  // "✓ Sent" flash so the user gets clear feedback even though the
+  // action is instant (localStorage write).
+  const [sending, setSending] = useState(false)
+  const [sentFlash, setSentFlash] = useState(false)
 
   const commitCaption = (): void => {
     setEditing(false)
     if (draft.trim() !== capture.caption) onUpdateCaption(capture.id, draft.trim())
+  }
+
+  /** Ship this capture to the Part's doc editor and jump to the doc.
+   *  The image lands inside a <figure> with the same annotatable shell
+   *  as images inserted via the doc's own image button, so Pencil /
+   *  Pin / Caption tools work on it immediately. */
+  const sendToDoc = async (): Promise<void> => {
+    if (sending) return
+    setSending(true)
+    try {
+      await appendImageToDoc(capture.id, {
+        partId: capture.partId,
+        caption: capture.caption,
+        width: capture.width,
+        height: capture.height,
+      })
+      setSentFlash(true)
+      // Show the ✓ flash for 600ms, then navigate the user to the doc
+      // so they can see the freshly-added image in context.
+      window.setTimeout(() => {
+        router.push(`/parts/${capture.partId}/doc`)
+      }, 600)
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[capture→doc] send failed', err)
+      window.alert(
+        `Couldn't send to doc: ${err instanceof Error ? err.message : 'unknown error'}`,
+      )
+      setSending(false)
+    }
   }
 
   // ── Drag-and-drop handlers ──────────────────────────────────────────────
@@ -220,15 +258,47 @@ export default function CaptureThumbnail({
         )}
       </div>
 
-      {/* Remove button — appears on hover, keyboard-focusable always */}
-      <button
-        type="button"
-        onClick={() => onRemove(capture.id)}
-        aria-label={`Remove capture ${index + 1}`}
-        className="flex h-6 w-6 shrink-0 items-center justify-center self-start rounded text-slate-400 opacity-0 transition focus:opacity-100 hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
-      >
-        <Trash2 className="h-3 w-3" />
-      </button>
+      {/* Action cluster — Send-to-doc + Remove.
+          Send-to-doc is always visible (primary "submit" affordance),
+          Remove appears on hover.
+
+          The send button flips through three visual states:
+            · idle   → paper-icon + tooltip "Send to doc"
+            · sending → spinner (transient, ~300ms)
+            · sent   → green ✓ flash (~600ms) before navigating away  */}
+      <div className="flex shrink-0 flex-col items-center gap-1 self-start">
+        <button
+          type="button"
+          onClick={sendToDoc}
+          disabled={sending}
+          aria-label={`Send capture ${index + 1} to doc`}
+          title={sentFlash ? 'Sent!' : 'Send this screenshot to the doc'}
+          className={[
+            'flex h-6 w-6 items-center justify-center rounded transition',
+            sentFlash
+              ? 'bg-emerald-500 text-white'
+              : sending
+                ? 'bg-primary/20 text-primary'
+                : 'text-primary hover:bg-primary/10',
+          ].join(' ')}
+        >
+          {sending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : sentFlash ? (
+            <span className="text-[10px] font-black leading-none">✓</span>
+          ) : (
+            <FileText className="h-3 w-3" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(capture.id)}
+          aria-label={`Remove capture ${index + 1}`}
+          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 opacity-0 transition focus:opacity-100 hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
     </li>
   )
 }

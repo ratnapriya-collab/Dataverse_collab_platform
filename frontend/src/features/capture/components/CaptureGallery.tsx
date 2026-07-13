@@ -10,9 +10,11 @@
  */
 
 import { useState } from 'react'
-import { AlertCircle, Camera, ImageOff, Loader2, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { AlertCircle, Camera, FileText, ImageOff, Loader2, X } from 'lucide-react'
 import { useCaptureStore } from '../store/captureStore'
 import { useRestoreView } from '../hooks/useRestoreView'
+import { appendImageToDoc } from '../lib/sendToDoc'
 import type { Capture } from '../types/capture.types'
 import CaptureThumbnail from './CaptureThumbnail'
 import ExportPdfButton from './ExportPdfButton'
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export default function CaptureGallery({ open, onClose, partName }: Props): JSX.Element | null {
+  const router = useRouter()
   const captures = useCaptureStore((s) => s.captures)
   const loading = useCaptureStore((s) => s.loading)
   const error = useCaptureStore((s) => s.error)
@@ -37,6 +40,34 @@ export default function CaptureGallery({ open, onClose, partName }: Props): JSX.
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   // Which thumb is currently animating, if any — drives the per-row spinner.
   const [restoringId, setRestoringId] = useState<string | null>(null)
+  // Bulk "Send all to doc" state.
+  const [sendingAll, setSendingAll] = useState(false)
+
+  /** Ship every capture in the gallery to the doc, in order, then jump
+   *  to the doc so the user sees them queued up. */
+  const sendAllToDoc = async (): Promise<void> => {
+    if (sendingAll || captures.length === 0) return
+    const partId = captures[0]!.partId
+    setSendingAll(true)
+    try {
+      for (const c of captures) {
+        await appendImageToDoc(c.id, {
+          partId: c.partId,
+          caption: c.caption,
+          width: c.width,
+          height: c.height,
+        })
+      }
+      router.push(`/parts/${partId}/doc`)
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[capture→doc] send-all failed', err)
+      window.alert(
+        `Couldn't send all to doc: ${err instanceof Error ? err.message : 'unknown error'}`,
+      )
+      setSendingAll(false)
+    }
+  }
 
   const handleRestoreView = async (capture: Capture): Promise<void> => {
     if (restoringId !== null) return // ignore double-clicks during an animation
@@ -137,21 +168,42 @@ export default function CaptureGallery({ open, onClose, partName }: Props): JSX.
         )}
       </div>
 
-      {/* Footer — Export PDF when there's content */}
+      {/* Footer — Send-all-to-doc + Export PDF + Clear all */}
       {captures.length > 0 && (
-        <footer className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/60 px-4 py-3">
+        <footer className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50/60 px-4 py-3">
+          {/* Primary CTA — Send all screenshots into the doc editor */}
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Clear all captured views? This cannot be undone.')) {
-                clear()
-              }
-            }}
-            className="text-[11px] font-semibold text-slate-500 transition hover:text-rose-600"
+            onClick={sendAllToDoc}
+            disabled={sendingAll}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-primary to-brand px-3 py-2 text-[12px] font-bold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Clear all
+            {sendingAll ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Sending {captures.length}…
+              </>
+            ) : (
+              <>
+                <FileText className="h-3.5 w-3.5" />
+                Submit all {captures.length} to doc
+              </>
+            )}
           </button>
-          <ExportPdfButton partName={partName} />
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Clear all captured views? This cannot be undone.')) {
+                  clear()
+                }
+              }}
+              className="text-[11px] font-semibold text-slate-500 transition hover:text-rose-600"
+            >
+              Clear all
+            </button>
+            <ExportPdfButton partName={partName} />
+          </div>
         </footer>
       )}
     </aside>

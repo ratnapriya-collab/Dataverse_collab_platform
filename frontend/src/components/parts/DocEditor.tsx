@@ -295,6 +295,103 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
     setVersions(loadVersions(partId, activeTabId))
   }, [partId, activeTabId])
 
+  // Listen for external appends from the Capture gallery ("Send to doc"
+  // and "Submit all to doc"). When a screenshot is written into our
+  // localStorage key by the gallery, refresh the editor from storage so
+  // the newly-appended image appears without a page reload.
+  useEffect(() => {
+    const onExternalAppend = (e: Event): void => {
+      const detail = (e as CustomEvent<{
+        storageKey: string
+        partId: string
+        tabId: string
+      }>).detail
+      if (detail.partId !== partId || detail.tabId !== activeTabId) return
+      const node = editorRef.current
+      if (node === null) return
+      node.innerHTML = readDoc(partId, activeTabId)
+      // Kick the capture-ref resolver so the newly-appended <img.dv-capture-ref>
+      // gets its blob URL immediately.
+      window.dispatchEvent(new CustomEvent('dv:doc:resolve-capture-refs'))
+    }
+    window.addEventListener('dv:doc:external-append', onExternalAppend)
+    return () => window.removeEventListener('dv:doc:external-append', onExternalAppend)
+  }, [partId, activeTabId])
+
+  // Resolve <img class="dv-capture-ref" data-capture-id="…"> placeholders
+  // by fetching each capture's bytes from /api/captures/{id}/image and
+  // swapping the src for a blob URL. This is the strategy we use instead
+  // of inlining base64 into the doc HTML, because base64 blows past the
+  // ~5-10MB localStorage quota after just a few 1460×915 screenshots.
+  //
+  // Blob URLs are per-document lifetimes — we revoke them when the
+  // editor unmounts or the tab changes, matching the captureStore's
+  // "single owner" pattern.
+  useEffect(() => {
+    const node = editorRef.current
+    if (node === null) return
+
+    const created: string[] = []
+    const resolveAll = async (): Promise<void> => {
+      const refs = node.querySelectorAll<HTMLImageElement>(
+        'img.dv-capture-ref[data-capture-id]',
+      )
+      const jobs: Promise<void>[] = []
+      refs.forEach((img) => {
+        const id = img.getAttribute('data-capture-id')
+        if (id === null || id === '') return
+        // Skip if we've already resolved this one (src is a blob URL).
+        if (img.src.startsWith('blob:')) return
+        jobs.push(
+          api.captures
+            .fetchImageBlob(id)
+            .then((blob) => {
+              const url = URL.createObjectURL(blob)
+              created.push(url)
+              img.src = url
+              // Once loaded, drop the .dv-capture-ref marker so the image
+              // hover tools treat it like any other embedded image.
+              img.addEventListener(
+                'load',
+                () => {
+                  img.classList.remove('dv-capture-ref')
+                },
+                { once: true },
+              )
+            })
+            .catch((err) => {
+              // eslint-disable-next-line no-console
+              console.warn(`[doc] could not hydrate capture ${id}`, err)
+              img.setAttribute('data-hydrate-failed', '1')
+              img.setAttribute('alt', 'Screenshot could not be loaded')
+            }),
+        )
+      })
+      await Promise.allSettled(jobs)
+    }
+
+    // Initial pass on mount / tab change.
+    void resolveAll()
+
+    // Re-run when the gallery appends new refs.
+    const onResolve = (): void => {
+      void resolveAll()
+    }
+    window.addEventListener('dv:doc:resolve-capture-refs', onResolve)
+
+    return () => {
+      window.removeEventListener('dv:doc:resolve-capture-refs', onResolve)
+      // Revoke every blob URL we minted so we don't leak memory.
+      for (const url of created) {
+        try {
+          URL.revokeObjectURL(url)
+        } catch {
+          /* already revoked */
+        }
+      }
+    }
+  }, [partId, activeTabId])
+
   /** Replace the editor content with a template. Confirms first so the
    *  user doesn't lose in-progress writing by accident. Also persists
    *  the chosen doc type so the header badge reflects it. */

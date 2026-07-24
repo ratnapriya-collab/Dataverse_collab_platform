@@ -31,7 +31,10 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Camera,
   ExternalLink,
+  Eye,
+  EyeOff,
   Images,
   PanelLeftClose,
   PanelLeftOpen,
@@ -158,6 +161,10 @@ export default function PartProViewerPage(): JSX.Element {
   // will let us route capture requests to the iframe's native screenshot.
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  // Toggle for the draggable "+" pin overlay — comment pins sit on top of
+  // the 3D content and can clutter screenshots or demos; hiding them
+  // gives a clean model view without deleting any comment data.
+  const [pinsHidden, setPinsHidden] = useState(false)
   const captureCount = useCaptureStore((s) => s.captures.length)
   const cleanupCaptures = useCaptureStore((s) => s.cleanup)
   const loadCapturesForPart = useCaptureStore((s) => s.loadForPart)
@@ -610,7 +617,7 @@ export default function PartProViewerPage(): JSX.Element {
               Default positions come from a phyllotaxis spiral centered
               on the viewer; user-set positions override via a
               localStorage-backed per-part map. */}
-          {v2Threads.length > 0 && (() => {
+          {!pinsHidden && v2Threads.length > 0 && (() => {
             const STORAGE_KEY = `dataverse.pinpos.${partId}`
             // Read once per render — cheap.
             const getStoredPos = (): Record<string, { x: number; y: number }> => {
@@ -729,19 +736,18 @@ export default function PartProViewerPage(): JSX.Element {
             )
           })()}
 
-          {/* Capture-view affordance — floats over the iframe top-right.
-              Same toolbar as the regular 3D Model page. */}
-          <CaptureToolbar
-            viewerContainerRef={viewerContainerRef}
+          {/* Floating action toolbar — Hide-pins toggle, Capture,
+              Gallery. Positioned bottom-left of the viewer so it
+              never overlaps the iframe's own top-right user chip. */}
+          <ProViewerActionBar
+            iframeRef={iframeRef}
+            iframeReady={iframeReady}
             partId={part.id}
             partName={part.name}
             captureCount={captureCount}
+            pinsHidden={pinsHidden}
+            onTogglePins={() => setPinsHidden((v) => !v)}
             onOpenGallery={() => setGalleryOpen(true)}
-            onCaptureError={(err) => {
-              // eslint-disable-next-line no-console
-              console.error('Capture failed:', err)
-              window.alert(`Capture failed: ${err.message}`)
-            }}
             onCaptureSuccess={() => {
               if (!galleryOpen) setGalleryOpen(true)
             }}
@@ -759,39 +765,179 @@ export default function PartProViewerPage(): JSX.Element {
   )
 }
 
-// ── Capture toolbar — copied from /parts/[id] so the affordance is identical ──
+// ── Pro Viewer action bar — Hide pins · Capture · Gallery ──
+//
+// Sits at the BOTTOM-LEFT of the viewer so it never collides with the
+// iframe's own top-right user/presence chip. Capture flow uses the
+// postMessage bridge (parentBridge → App.tsx) — the host asks the
+// iframe for a screenshot, receives a JPEG dataUrl back, uploads it
+// via api.captures.create() and pushes it into the shared captureStore
+// so the gallery immediately reflects the new capture.
 
-function CaptureToolbar({
-  viewerContainerRef,
+function ProViewerActionBar({
+  iframeRef,
+  iframeReady,
   partId,
   partName,
   captureCount,
+  pinsHidden,
+  onTogglePins,
   onOpenGallery,
-  onCaptureError,
   onCaptureSuccess,
 }: {
-  viewerContainerRef: React.RefObject<HTMLElement>
+  iframeRef: React.RefObject<HTMLIFrameElement>
+  iframeReady: boolean
   partId: string
   partName: string
   captureCount: number
+  pinsHidden: boolean
+  onTogglePins: () => void
   onOpenGallery: () => void
-  onCaptureError: (err: Error) => void
   onCaptureSuccess: () => void
 }): JSX.Element {
-  const { capture, isReady } = useViewerCapture({
-    viewerContainerRef,
-    partId,
-    partName,
-  })
+  const [isCapturing, setIsCapturing] = useState(false)
+  const addPersisted = useCaptureStore((s) => s.addPersisted)
+
+  const handleCapture = async (): Promise<void> => {
+    const win = iframeRef.current?.contentWindow
+    if (!win || !iframeReady) {
+      window.alert('3D viewer is still loading — try again in a moment')
+      return
+    }
+    setIsCapturing(true)
+    // Correlation id — the iframe echoes this in its capture-result reply
+    // so we can match responses even if multiple captures overlap.
+    const requestId = `cap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+    try {
+      // Race a 6-second timeout so a silent iframe never hangs the UI.
+      const dataUrl = await new Promise<{ url: string; w: number; h: number }>(
+        (resolve, reject) => {
+          const timer = window.setTimeout(() => {
+            window.removeEventListener('message', handler)
+            reject(new Error('capture timed out'))
+          }, 6000)
+          const handler = (e: MessageEvent): void => {
+            const d = e.data as {
+              source?: unknown
+              type?: unknown
+              requestId?: unknown
+              dataUrl?: unknown
+              width?: unknown
+              height?: unknown
+              error?: unknown
+            } | undefined
+            if (d === undefined || d === null) return
+            if (d.source !== 'dv-3d-viewer') return
+            if (d.type !== 'capture-result') return
+            if (d.requestId !== requestId) return
+            window.clearTimeout(timer)
+            window.removeEventListener('message', handler)
+            if (typeof d.error === 'string') {
+              reject(new Error(d.error))
+              return
+            }
+            if (typeof d.dataUrl !== 'string') {
+              reject(new Error('capture returned no dataUrl'))
+              return
+            }
+            resolve({
+              url: d.dataUrl,
+              w: typeof d.width === 'number' ? d.width : 0,
+              h: typeof d.height === 'number' ? d.height : 0,
+            })
+          }
+          window.addEventListener('message', handler)
+          win.postMessage(
+            {
+              source: 'dataverse-host',
+              type: 'request-capture',
+              requestId,
+              quality: 0.9,
+            },
+            '*',
+          )
+        },
+      )
+
+      // Convert dataUrl → Blob for upload.
+      const blob = await (await fetch(dataUrl.url)).blob()
+
+      const server = await api.captures.create(partId, blob, {
+        caption: '',
+        width: dataUrl.w,
+        height: dataUrl.h,
+        cameraState: { alpha: null, beta: null, radius: null, target: null },
+      })
+
+      const previewUrl = URL.createObjectURL(blob)
+      addPersisted({
+        id: server.id,
+        previewUrl,
+        blob,
+        caption: server.caption,
+        width: server.width,
+        height: server.height,
+        capturedAt: server.created_at,
+        camera: { alpha: null, beta: null, radius: null, target: null },
+        view: {
+          cameraMode: 'perspective',
+          shadingMode: 'shaded',
+          gridVisible: true,
+          axesVisible: true,
+          explodeFactor: 0,
+          sectionPlane: null,
+          pmiVisible: true,
+        },
+        partId,
+        partName,
+      })
+      onCaptureSuccess()
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Pro Viewer capture failed:', err)
+      window.alert(`Capture failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setIsCapturing(false)
+    }
+  }
+
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2">
-      <CaptureButton
-        onCapture={capture}
-        onSuccess={onCaptureSuccess}
-        onError={onCaptureError}
-        isReady={isReady}
-        className="pointer-events-auto"
-      />
+    <div className="pointer-events-none absolute bottom-4 left-4 z-30 flex items-center gap-2">
+      {/* Hide / show comment pins */}
+      <button
+        type="button"
+        onClick={onTogglePins}
+        aria-pressed={pinsHidden}
+        title={pinsHidden ? 'Show comment pins' : 'Hide comment pins for a clean screenshot'}
+        className={[
+          'pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur transition hover:shadow-lg',
+          pinsHidden
+            ? 'border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-400'
+            : 'border-slate-200 bg-white/95 text-slate-700 hover:border-primary/40 hover:text-primary',
+        ].join(' ')}
+      >
+        {pinsHidden ? (
+          <EyeOff className="h-3.5 w-3.5" />
+        ) : (
+          <Eye className="h-3.5 w-3.5 text-primary" />
+        )}
+        {pinsHidden ? 'Pins hidden' : 'Hide pins'}
+      </button>
+
+      {/* Capture */}
+      <button
+        type="button"
+        onClick={handleCapture}
+        disabled={isCapturing || !iframeReady}
+        aria-label="Capture the current 3D view"
+        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-md backdrop-blur transition hover:border-primary/40 hover:text-primary hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Camera className="h-3.5 w-3.5 text-primary" />
+        {isCapturing ? 'Capturing…' : 'Capture view'}
+      </button>
+
+      {/* Gallery */}
       <button
         type="button"
         onClick={onOpenGallery}

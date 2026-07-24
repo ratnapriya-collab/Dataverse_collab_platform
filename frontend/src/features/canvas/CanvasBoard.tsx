@@ -24,8 +24,27 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import {
+  DoorOpen,
+  Lock,
+  OctagonAlert,
+  Rocket,
+  Train,
+  Zap,
+  Image as ImageIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { useCanvasStore, newNodeId, type CanvasNode } from './canvasStore'
 import LiveCursors from './LiveCursors'
+
+const LUCIDE_ICONS: Record<string, LucideIcon> = {
+  DoorOpen,
+  Lock,
+  OctagonAlert,
+  Rocket,
+  Train,
+  Zap,
+}
 
 interface Props {
   partId: string
@@ -430,33 +449,147 @@ function NodeView({
   }
 
   if (node.kind === 'rect') {
+    const variant = node.variant ?? 'outline'
+    const fontSize = node.fontSize ?? 12
+    // 'pill' — flat pill button (used for column headers + tab pills)
+    // 'filled' — solid rounded box (used for the framed board bg)
+    // 'outline' (default) — border-only box; the FMEA frame + generic rects
+    const isPill = variant === 'pill'
+    const isFilled = variant === 'filled'
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      left: node.x,
+      top: node.y,
+      width: node.w,
+      height: node.h,
+      border: isPill || isFilled ? 'none' : `1.5px solid ${node.color}`,
+      borderRadius: isPill ? 999 : 8,
+      backgroundColor: isPill || isFilled ? node.color : `${node.color}12`,
+      boxShadow: ring,
+      cursor: tool === 'select' ? 'move' : 'default',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: isPill ? '0 12px' : 8,
+      zIndex: node.z,
+    }
+    return (
+      <>
+        {node.titleAbove !== undefined && (
+          <div
+            style={{
+              position: 'absolute',
+              left: node.x + 4,
+              top: node.y - 22,
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#0f172a',
+              letterSpacing: 0.1,
+            }}
+          >
+            {node.titleAbove}
+          </div>
+        )}
+        <div {...dragProps} style={style}>
+          <span
+            contentEditable={!isPill}
+            suppressContentEditableWarning
+            onInput={(e) => onChangeText((e.currentTarget as HTMLSpanElement).innerText)}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              outline: 'none',
+              fontSize,
+              fontWeight: isPill ? 700 : 600,
+              color: '#0f172a',
+              textAlign: 'center',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '100%',
+            }}
+          >
+            {node.text || (variant === 'outline' ? '' : '')}
+          </span>
+        </div>
+      </>
+    )
+  }
+
+  if (node.kind === 'chip') {
+    // Colored pill with a cursor-shaped tail — the "presence" marker
+    // showing which teammate is looking at what.
+    const arrowDx = node.arrow === 'left' ? -8 : node.arrow === 'right' ? 8 : 0
+    const arrowDy = node.arrow === 'up' ? -10 : node.arrow === 'down' ? 10 : 0
+    return (
+      <div
+        {...dragProps}
+        style={{
+          position: 'absolute', left: node.x, top: node.y,
+          display: 'flex', alignItems: 'center', gap: 6,
+          cursor: tool === 'select' ? 'move' : 'default',
+          boxShadow: ring, borderRadius: 6,
+        }}
+      >
+        {/* Cursor arrow — small triangle in the same color, offset above/beside */}
+        <svg
+          width={14}
+          height={14}
+          viewBox="0 0 14 14"
+          style={{
+            position: 'absolute',
+            left: arrowDx - 4,
+            top: arrowDy - 4,
+            filter: 'drop-shadow(0 1px 1px rgba(15,23,42,0.25))',
+          }}
+        >
+          <path d="M0 0 L14 5 L6 7 L4 14 Z" fill={node.color} />
+        </svg>
+        <span
+          style={{
+            display: 'inline-block',
+            backgroundColor: node.color,
+            color: '#ffffff',
+            fontSize: 11,
+            fontWeight: 700,
+            padding: '3px 10px',
+            borderRadius: 4,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(15,23,42,0.18)',
+          }}
+        >
+          {node.text}
+        </span>
+      </div>
+    )
+  }
+
+  if (node.kind === 'image') {
+    // Lucide icon placeholder for a CAD screenshot. Right-click / future
+    // "Replace with capture" swaps in an actual image.
+    const IconCmp: LucideIcon =
+      node.icon !== undefined ? (LUCIDE_ICONS[node.icon] ?? ImageIcon) : ImageIcon
     return (
       <div
         {...dragProps}
         style={{
           position: 'absolute', left: node.x, top: node.y,
           width: node.w, height: node.h,
-          border: `2px solid ${node.color}`,
-          borderRadius: 6,
-          backgroundColor: `${node.color}12`,  // 12/255 alpha
-          boxShadow: ring,
-          cursor: tool === 'select' ? 'move' : 'default',
+          borderRadius: 10,
+          background: node.src === undefined
+            ? 'linear-gradient(135deg,#f0f9ff 0%, #e0f2fe 100%)'
+            : `#fff url(${node.src}) center/contain no-repeat`,
+          border: '1px solid #bae6fd',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 8,
+          boxShadow: ring !== 'none' ? ring : '0 1px 2px rgba(2,132,199,0.08)',
+          cursor: tool === 'select' ? 'move' : 'default',
         }}
       >
-        <span
-          contentEditable
-          suppressContentEditableWarning
-          onInput={(e) => onChangeText((e.currentTarget as HTMLSpanElement).innerText)}
-          onPointerDown={(e) => e.stopPropagation()}
-          style={{
-            outline: 'none', fontSize: 12, fontWeight: 600,
-            color: '#0f172a', textAlign: 'center',
-          }}
-        >
-          {node.text || 'Rectangle'}
-        </span>
+        {node.src === undefined && (
+          node.icon !== undefined
+            ? <IconCmp size={52} strokeWidth={1.4} color="#0284c7" />
+            : <span style={{ fontSize: 48, opacity: 0.85 }}>{node.emoji ?? '📷'}</span>
+        )}
       </div>
     )
   }

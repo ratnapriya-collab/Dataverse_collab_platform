@@ -9,10 +9,10 @@
  * storyboards, and design-review brainstorms.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Box, FileText, Users, Layers } from 'lucide-react'
+import { ArrowLeft, Box, FileText, Users, Layers, Rocket, RefreshCcw } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import type { PartDetail } from '@/types/api'
 import { clearToken } from '@/lib/auth'
@@ -29,6 +29,25 @@ export default function CanvasPage(): JSX.Element {
   const [part, setPart] = useState<PartDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const nodes = useCanvasStore((s) => s.byPartId[partId] ?? [])
+  const seedFMEATemplate = useCanvasStore((s) => s.seedFMEATemplate)
+  const clearAll = useCanvasStore((s) => s.clearAll)
+  const loadForPart = useCanvasStore((s) => s.loadForPart)
+  const canvasSectionRef = useRef<HTMLElement | null>(null)
+
+  const loadTemplate = (): void => {
+    loadForPart(partId)
+    clearAll()
+    // rAF so the DOM has time to react to the clear before the re-seed
+    // recomputes centering against a still-mounted <section>.
+    requestAnimationFrame(() => {
+      const rect = canvasSectionRef.current?.getBoundingClientRect()
+      seedFMEATemplate(
+        rect !== undefined && rect !== null
+          ? { width: rect.width, height: rect.height }
+          : undefined,
+      )
+    })
+  }
 
   useEffect(() => {
     if (partId === '') return
@@ -130,6 +149,15 @@ export default function CanvasPage(): JSX.Element {
           </div>
           <button
             type="button"
+            onClick={loadTemplate}
+            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-sky-600 to-cyan-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:shadow-md"
+            title="Clear the board and reload the Hyperloop Pod FMEA template, re-centered"
+          >
+            <RefreshCcw className="h-3 w-3" />
+            Reload FMEA
+          </button>
+          <button
+            type="button"
             className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm hover:shadow-md"
           >
             <Users className="h-3 w-3" />
@@ -139,22 +167,31 @@ export default function CanvasPage(): JSX.Element {
       </header>
 
       {/* Canvas fills remaining height */}
-      <section className="relative flex-1 overflow-hidden">
+      <section ref={canvasSectionRef} className="relative flex-1 overflow-hidden">
         <CanvasBoard partId={partId} />
         <CanvasColorPalette />
         <CanvasBottomToolbar />
 
         {/* Empty-state hint — visible only when the board is empty */}
         {nodes.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
-            <div className="rounded-lg bg-white/70 px-6 py-4 text-center backdrop-blur">
-              <p className="text-[13px] font-bold text-slate-700">
-                Blank canvas — start brainstorming
+          <div className="absolute inset-0 z-0 flex items-center justify-center">
+            <div className="pointer-events-auto rounded-lg bg-white/90 px-8 py-6 text-center shadow-lg ring-1 ring-slate-200 backdrop-blur">
+              <p className="text-[14px] font-bold text-slate-800">
+                Blank canvas — start with a template
               </p>
               <p className="mt-1 text-[11px] text-slate-500">
-                Pick <strong>Sticky</strong> below and click anywhere to drop a note ·
-                <br />
-                Ctrl+Scroll to zoom · middle-click to pan
+                Loads a 5-stage Failure Mode &amp; Effects map for the pod
+              </p>
+              <button
+                type="button"
+                onClick={loadTemplate}
+                className="mt-3 inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-sky-600 to-cyan-500 px-4 py-2 text-[12px] font-bold text-white shadow-md transition hover:shadow-lg"
+              >
+                <Rocket className="h-3.5 w-3.5" />
+                Load Hyperloop Pod FMEA template
+              </button>
+              <p className="mt-3 text-[10.5px] text-slate-400">
+                or pick a tool below and click anywhere · Ctrl+Scroll to zoom · middle-click to pan
               </p>
             </div>
           </div>

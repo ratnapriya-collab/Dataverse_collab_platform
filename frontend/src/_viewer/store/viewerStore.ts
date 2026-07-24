@@ -58,6 +58,12 @@ interface ViewerStore {
   removeSelection:(name: string) => void
   clearSelection: () => void
 
+  // Single hover / select for the CAD View's Assembly Tree.
+  hoveredMesh: string | null
+  setHoveredMesh: (name: string | null) => void
+  selectedMesh: string | null
+  setSelectedMesh: (name: string | null) => void
+
   // Isolate
   isolatedNames: Set<string>
   isolate:   (names: Set<string>) => void
@@ -159,6 +165,11 @@ export const useViewerStore = create<ViewerStore>((set) => ({
     return { selectedMeshNames: next, selectionInfo: next.size === 0 ? null : s.selectionInfo }
   }),
   clearSelection: () => set({ selectedMeshNames: new Set(), selectionInfo: null }),
+
+  hoveredMesh: null,
+  setHoveredMesh: (hoveredMesh) => set({ hoveredMesh }),
+  selectedMesh: null,
+  setSelectedMesh: (selectedMesh) => set({ selectedMesh }),
 
   // Isolate — actual mesh show/hide is handled by IsolateController
   isolatedNames: new Set<string>(),

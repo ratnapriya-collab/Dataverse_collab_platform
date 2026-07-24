@@ -22,6 +22,7 @@ from app.models.user import User
 from app.schemas.part import PartDetail, PartRead
 from app.utils.auth import get_current_user
 from app.utils.events import log_event
+from app.utils.step_to_glb import step_bytes_to_glb_bytes
 from app.utils.storage import (
     StorageError,
     absolute_path,
@@ -94,6 +95,34 @@ async def upload_part(
         rel_path, digest = save_bytes(owner_id=current.id, data=data, ext=ext)
     except StorageError as exc:
         raise _bad_request(str(exc)) from exc
+
+    # For STEP uploads, tessellate to GLB alongside the original file so the
+    # viewer can render real geometry. The GLB shares the STEP's sha256 base
+    # (same file → same converted output), keyed by extension. Failure here
+    # is non-fatal — the STEP is already saved, and the viewer falls back to
+    # sample geometry if the GLB doesn't exist.
+    #
+    # Broad `Exception` catch (not just ValueError/OSError/RuntimeError) —
+    # gmsh raises everything from custom errors to bare SystemErrors when
+    # it can't parse a STEP file. Whatever it throws, we log and continue
+    # so the upload still succeeds; the frontend degrades gracefully.
+    if ext in ("step", "stp"):
+        try:
+            glb_bytes = step_bytes_to_glb_bytes(data)
+            save_bytes(owner_id=current.id, data=glb_bytes, ext="glb")
+            logger.info(
+                "step_glb_converted",
+                extra={"step_hash": digest, "glb_bytes": len(glb_bytes)},
+            )
+        except Exception as exc:  # noqa: BLE001 — deliberate broad catch
+            logger.warning(
+                "step_glb_conversion_failed",
+                extra={
+                    "step_hash": digest,
+                    "error_type": type(exc).__name__,
+                    "error_msg": str(exc)[:300],
+                },
+            )
 
     display_name = (name or _strip_ext(file.filename)).strip() or file.filename
 
@@ -202,6 +231,82 @@ def get_part_file(
         path=abs_path,
         media_type=media_type_for(ext),
         filename=part.file_name,
+    )
+
+
+@router.get("/{part_id}/glb")
+def get_part_glb(
+    part_id: str,
+    token: str | None = Query(default=None, description="Short-lived file token (alt to Authorization header)"),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    """Stream the server-side-tessellated GLB for a STEP part.
+
+    Accepts EITHER a short-lived file-download token (query string) OR
+    a standard Authorization Bearer JWT (header). Query-token mode is
+    what the frontend uses because Babylon.js loads the GLB via a plain
+    URL and can't attach a header.
+
+    Returns 404 if the GLB doesn't exist — the frontend then falls back
+    to sample geometry, same behavior as before conversion existed.
+    """
+    part = session.get(Part, part_id)
+    if part is None:
+        raise _not_found()
+
+    # Auth: token (query) OR bearer (header). Token path mirrors /file so
+    # signed URLs from the API work for both.
+    if token is not None:
+        try:
+            claims = decode_file_download_token(token)
+        except TokenError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "message": str(exc)},
+            ) from exc
+        if claims["sub"] != part_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "message": "token does not match this part"},
+            )
+        if part.owner_id != claims["owner"]:
+            raise _forbidden()
+    else:
+        # Fall back to bearer-header auth. FastAPI re-resolves the dep
+        # via get_current_user() manually so we can keep the parameter
+        # optional in the signature above.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "no_auth", "message": "Missing ?token=... query parameter"},
+        )
+
+    # The GLB lives alongside the STEP at <owner>/<sha256>.glb (same
+    # content hash as the STEP because that's how we key both files).
+    glb_rel = f"{part.owner_id}/{part.content_hash}.glb"
+    try:
+        abs_path = absolute_path(glb_rel)
+    except StorageError as exc:
+        logger.error(
+            "storage_resolve_failed", extra={"part_id": part_id, "error": str(exc)}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "storage", "message": "Could not resolve GLB path"},
+        ) from exc
+
+    if not abs_path.exists():
+        # GLB not converted yet (e.g. conversion failed at upload, or the
+        # STEP was uploaded before this feature landed). Frontend handles
+        # the 404 by falling back to sample geometry.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "no_glb", "message": "GLB not available for this part"},
+        )
+
+    return FileResponse(
+        path=abs_path,
+        media_type="model/gltf-binary",
+        filename=f"{_strip_ext(part.file_name)}.glb",
     )
 
 

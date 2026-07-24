@@ -531,8 +531,16 @@ export default function PartPage() {
     )
   }
 
-  const ext = (part.file_name.split('.').pop() ?? '').toLowerCase()
-  const fileUrl = apiUrl(part.file_url)
+  const rawExt = (part.file_name.split('.').pop() ?? '').toLowerCase()
+  // The viewer's Babylon SceneLoader can't tessellate STEP directly, so the
+  // backend converts STEP → GLB on upload (see step_to_glb.py). We route the
+  // viewer to that GLB instead of the raw STEP — the /glb endpoint accepts
+  // the same short-lived file token as /file, so a plain URL swap works.
+  const ext = rawExt === 'step' || rawExt === 'stp' ? 'glb' : rawExt
+  const fileUrl =
+    rawExt === 'step' || rawExt === 'stp'
+      ? apiUrl(part.file_url.replace('/file?', '/glb?'))
+      : apiUrl(part.file_url)
 
   return (
     <main className="flex h-screen flex-col">

@@ -605,6 +605,130 @@ export default function PartProViewerPage(): JSX.Element {
             onLoad={() => setFrameLoaded(true)}
           />
 
+          {/* Host-side pin overlay — every pin is DRAGGABLE so the user
+              can position it exactly on the feature it comments on.
+              Default positions come from a phyllotaxis spiral centered
+              on the viewer; user-set positions override via a
+              localStorage-backed per-part map. */}
+          {v2Threads.length > 0 && (() => {
+            const STORAGE_KEY = `dataverse.pinpos.${partId}`
+            // Read once per render — cheap.
+            const getStoredPos = (): Record<string, { x: number; y: number }> => {
+              if (typeof window === 'undefined') return {}
+              try {
+                return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}')
+              } catch { return {} }
+            }
+            const savePos = (map: Record<string, { x: number; y: number }>): void => {
+              try {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
+              } catch { /* quota — non-fatal */ }
+            }
+            const stored = getStoredPos()
+
+            // Default phyllotaxis for pins the user hasn't dragged yet.
+            const golden = 2.399963
+            const pinAt = (i: number): { x: number; y: number } => {
+              const angle = i * golden
+              const radius = Math.min(22, 8 + Math.sqrt(i) * 4.5)
+              return {
+                x: 55 + radius * Math.cos(angle) * 1.3,
+                y: 52 + radius * Math.sin(angle) * 0.95,
+              }
+            }
+            const positions = v2Threads.map(
+              (t, i) => stored[t.id] ?? pinAt(i),
+            )
+
+            return (
+              <>
+                <PinLayer
+                  threads={v2Threads}
+                  positions={positions}
+                  selectedThreadId={selectedThreadId}
+                  onSelect={(id) => selectThread(id === selectedThreadId ? null : id, 'pin')}
+                  onMoved={(id, x, y) => {
+                    const cur = getStoredPos()
+                    cur[id] = { x, y }
+                    savePos(cur)
+                  }}
+                />
+
+                {/* Selected-comment popover — anchored to the pin's
+                    position, offset a little to the right so it doesn't
+                    cover the pin itself. Flips left when the pin is
+                    close to the right edge. */}
+                {selectedThreadId !== null && (() => {
+                  const idx = v2Threads.findIndex((t) => t.id === selectedThreadId)
+                  if (idx < 0) return null
+                  const selected = v2Threads[idx]!
+                  const anchor = positions[idx]!
+                  const author = selected.authorName ?? user?.name ?? 'You'
+                  // Card offset — 22px right of pin center. Flip to the
+                  // left when the pin sits in the right 30% of the viewer
+                  // so the 280px-wide card never runs off-screen.
+                  const flipLeft = anchor.x > 68
+                  return (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="dv-anim-pop pointer-events-auto absolute z-[60] w-[280px] rounded-lg border-2 border-amber-400 bg-white p-3 shadow-2xl"
+                      style={{
+                        left: `${anchor.x}%`,
+                        top: `${anchor.y}%`,
+                        transform: flipLeft
+                          ? 'translate(calc(-100% - 22px), -50%)'
+                          : 'translate(22px, -50%)',
+                      }}
+                    >
+                      {/* Little pointer nub aiming at the pin */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 border-amber-400 bg-white"
+                        style={
+                          flipLeft
+                            ? { right: -7, borderRight: '2px solid', borderTop: '2px solid' }
+                            : { left: -7, borderLeft: '2px solid', borderBottom: '2px solid' }
+                        }
+                      />
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true">
+                            <circle cx="13" cy="13" r="11" fill="#f59e0b" stroke="white" strokeWidth="2.5" />
+                            <line x1="13" y1="7" x2="13" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                            <line x1="7" y1="13" x2="19" y2="13" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                          </svg>
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-900">{author}</p>
+                            <p className="text-[9px] uppercase tracking-wider text-amber-600">
+                              Pin · {selected.status}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => selectThread(null, 'sidebar')}
+                          aria-label="Deselect"
+                          className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <p className="text-[12px] font-semibold leading-snug text-slate-900">
+                        {selected.title}
+                      </p>
+                      {selected.replyCount > 1 && (
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {selected.replyCount - 1} repl{selected.replyCount === 2 ? 'y' : 'ies'}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+              </>
+            )
+          })()}
+
           {/* Capture-view affordance — floats over the iframe top-right.
               Same toolbar as the regular 3D Model page. */}
           <CaptureToolbar
@@ -680,6 +804,150 @@ function CaptureToolbar({
           {captureCount}
         </span>
       </button>
+    </div>
+  )
+}
+
+// ── Draggable comment-pin layer ────────────────────────────────────────
+//
+// Each `+` pin is a small button positioned as `left/top` percentages of
+// the viewport container. Pointer-drag on the pin updates the local
+// position (60Hz smooth) and calls `onMoved` on release so the parent
+// can persist the new coords. Click without drag = select the comment.
+// The distinction is a 5-px movement threshold — anything under that
+// counts as a click, anything over as a drag.
+
+interface PinLayerThread {
+  id: string
+  title: string
+}
+
+function PinLayer({
+  threads, positions, selectedThreadId, onSelect, onMoved,
+}: {
+  threads: readonly PinLayerThread[]
+  positions: { x: number; y: number }[]
+  selectedThreadId: string | null
+  onSelect: (id: string) => void
+  onMoved: (id: string, x: number, y: number) => void
+}): JSX.Element {
+  const layerRef = useRef<HTMLDivElement | null>(null)
+  // Local overrides during a drag — flushed to onMoved on pointer-up so
+  // the parent can persist. Keeps drags smooth without re-rendering the
+  // parent 60×/sec.
+  const [dragOverride, setDragOverride] = useState<
+    Record<string, { x: number; y: number }>
+  >({})
+  const dragStateRef = useRef<{
+    id: string
+    startClientX: number
+    startClientY: number
+    startPct: { x: number; y: number }
+    moved: boolean
+  } | null>(null)
+
+  const onPointerDown = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    id: string,
+    pos: { x: number; y: number },
+  ): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    dragStateRef.current = {
+      id,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPct: pos,
+      moved: false,
+    }
+  }
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>): void => {
+    const s = dragStateRef.current
+    if (s === null || layerRef.current === null) return
+    const dx = e.clientX - s.startClientX
+    const dy = e.clientY - s.startClientY
+    if (!s.moved && Math.hypot(dx, dy) < 5) return  // click-vs-drag threshold
+    s.moved = true
+    const rect = layerRef.current.getBoundingClientRect()
+    const newX = Math.max(2, Math.min(98, s.startPct.x + (dx / rect.width) * 100))
+    const newY = Math.max(2, Math.min(98, s.startPct.y + (dy / rect.height) * 100))
+    setDragOverride((prev) => ({ ...prev, [s.id]: { x: newX, y: newY } }))
+  }
+
+  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>): void => {
+    const s = dragStateRef.current
+    if (s === null) return
+    try {
+      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch { /* already released */ }
+    if (s.moved) {
+      const finalPos = dragOverride[s.id]
+      if (finalPos !== undefined) {
+        onMoved(s.id, finalPos.x, finalPos.y)
+      }
+      // Clear the override next tick so parent's stored coord takes over
+      requestAnimationFrame(() => {
+        setDragOverride((prev) => {
+          const next = { ...prev }
+          delete next[s.id]
+          return next
+        })
+      })
+    } else {
+      onSelect(s.id)
+    }
+    dragStateRef.current = null
+  }
+
+  return (
+    <div
+      ref={layerRef}
+      className="pointer-events-none absolute inset-0 z-[55]"
+    >
+      {threads.map((t, i) => {
+        const isSelected = t.id === selectedThreadId
+        const pos = dragOverride[t.id] ?? positions[i]!
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onPointerDown={(e) => onPointerDown(e, t.id, pos)}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            title={`${t.title} — drag to reposition`}
+            aria-label={`Comment: ${t.title}`}
+            className={[
+              'pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform',
+              'cursor-grab active:cursor-grabbing',
+              isSelected
+                ? 'z-10 scale-[1.35] animate-pulse'
+                : 'hover:scale-125',
+            ].join(' ')}
+            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+          >
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 26 26"
+              style={{
+                filter: isSelected
+                  ? 'drop-shadow(0 0 6px rgba(245,158,11,0.9))'
+                  : 'drop-shadow(0 2px 4px rgba(15,23,42,0.35))',
+              }}
+            >
+              <circle
+                cx="13" cy="13" r="11"
+                fill={isSelected ? '#f59e0b' : '#0f5f52'}
+                stroke="white" strokeWidth="2.5"
+              />
+              <line x1="13" y1="7" x2="13" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="7" y1="13" x2="19" y2="13" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Plus,
   Quote,
+  Layers,
   RotateCcw,
   Send,
   Sparkles,
@@ -229,11 +230,12 @@ export default function PartConversationHub({
       {/* ── Quick-nav icon row ───────────────────────────────────────── */}
       <nav
         aria-label="Part companion views"
-        className="grid grid-cols-4 gap-1 border-b border-slate-100 px-2 py-1.5"
+        className="grid grid-cols-5 gap-1 border-b border-slate-100 px-2 py-1.5"
       >
         <QuickNav href={`/parts/${partId}/what-changed`} icon={RotateCcw} label="What changed" />
         <QuickNav href={`/parts/${partId}/walkthrough`} icon={Workflow} label="Walkthrough" />
         <QuickNav href={`/parts/${partId}/concierge`} icon={Sparkles} label="Concierge" tone="purple" />
+        <QuickNav href={`/parts/${partId}/canvas`} icon={Layers} label="Canvas" tone="teal" />
         <QuickNav href={`/parts/${partId}/plm-push`} icon={Send} label="Push to PLM" />
       </nav>
 
@@ -261,11 +263,16 @@ export default function PartConversationHub({
         {tab === 'comments' && (
           // v2 threaded comments — replaces inline DecisionsPanel.
           // Drawer mounts via portal so it floats over the viewer.
+          // seedFromDecisions: on mount, if the localStorage thread list
+          // for this part is empty, auto-hydrate it from the decisions
+          // fetched from the API — so users don't see "0 of 0" when
+          // decisions clearly exist. Existing threads are never touched.
           <CommentsPanel
             partId={partId}
             partName={partName}
             currentUser={currentUser}
             composeAnchor={composeAnchor}
+            seedFromDecisions={decisions}
           />
         )}
         {tab === 'issues' && <IssuesTabBody partId={partId} rows={issueRows} />}
@@ -335,12 +342,14 @@ function QuickNav({
   href: string
   icon: typeof RotateCcw
   label: string
-  tone?: 'purple'
+  tone?: 'purple' | 'teal'
 }): JSX.Element {
   const ring =
     tone === 'purple'
       ? 'hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700'
-      : 'hover:border-primary hover:bg-primary-50 hover:text-primary'
+      : tone === 'teal'
+        ? 'hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700'
+        : 'hover:border-primary hover:bg-primary-50 hover:text-primary'
   return (
     <Link
       href={href}

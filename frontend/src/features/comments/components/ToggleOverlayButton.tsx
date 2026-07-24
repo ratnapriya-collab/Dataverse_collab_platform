@@ -30,20 +30,21 @@ export default function ToggleOverlayButton({ totalCount }: Props): JSX.Element 
   const visible = useViewerStore((s) => s.commentsOverlayVisible)
   const toggle = useViewerStore((s) => s.toggleCommentsOverlay)
   const Icon = visible ? Eye : EyeOff
-  const disabled = totalCount === 0
+  // Deliberately NOT disabled at zero comments — users often want to
+  // preemptively hide the overlay before adding comments (e.g. before
+  // taking a clean capture), or after clearing all comments.
+  // Prop still accepted for future callers that might dim the button.
+  void totalCount
 
   return (
     <button
       type="button"
       onClick={toggle}
-      disabled={disabled}
       aria-pressed={!visible}
       title={
-        disabled
-          ? 'No comments to hide'
-          : visible
-            ? 'Hide all pins + comment cards on the 3D viewer'
-            : 'Show pins + comment cards on the 3D viewer'
+        visible
+          ? 'Hide all pins + comment cards on the 3D viewer'
+          : 'Show pins + comment cards on the 3D viewer'
       }
       className={[
         'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10.5px] font-semibold transition',
@@ -52,7 +53,6 @@ export default function ToggleOverlayButton({ totalCount }: Props): JSX.Element 
         !visible
           ? 'border-amber-400/60 bg-amber-50 text-amber-700 hover:bg-amber-100'
           : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40 hover:text-primary',
-        disabled ? 'cursor-not-allowed opacity-40' : '',
       ].join(' ')}
     >
       <Icon className="h-3 w-3" />

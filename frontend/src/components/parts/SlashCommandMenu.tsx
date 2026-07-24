@@ -142,14 +142,26 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       `<blockquote style="border-left:3px solid #cbd5e1;padding-left:12px;color:#475569;margin:8px 0">Quoted text…</blockquote>`,
   },
   {
-    id: 'table', label: 'Table (3x3)', hint: 'Basic 3-column table',
-    group: 'blocks', icon: TableIcon, keywords: ['table', 'grid'],
+    id: 'table', label: 'Smart Table', hint: 'Add rows/cols on hover · Tab-navigate',
+    group: 'blocks', icon: TableIcon, keywords: ['table', 'grid', 'smart'],
     build: () => {
-      const cell = (v: string): string =>
-        `<td style="padding:6px;border:1px solid #e2e8f0">${v}</td>`
-      const th = (v: string): string =>
-        `<th style="text-align:left;padding:6px;border:1px solid #cbd5e1;background:#f1f5f9">${v}</th>`
-      return `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${th('Column 1')}${th('Column 2')}${th('Column 3')}</tr></thead><tbody><tr>${cell('&nbsp;')}${cell('&nbsp;')}${cell('&nbsp;')}</tr><tr>${cell('&nbsp;')}${cell('&nbsp;')}${cell('&nbsp;')}</tr></tbody></table><p><br></p>`
+      // Smart Table markup — must be wrapped in .dv-smart-table-wrap so
+      // SmartTableController can pin its + col / + row buttons.
+      // Data rows are pre-filled with R1C1..R3C3 placeholders so users
+      // see the shape and can type over. Headers auto-labelled Column A/B/C.
+      const th = (v: string): string => `<th>${v}</th>`
+      const td = (v: string): string => `<td>${v}</td>`
+      const headers = `<tr>${th('Column A')}${th('Column B')}${th('Column C')}</tr>`
+      const rows = Array.from({ length: 3 }, (_, r) =>
+        `<tr>${Array.from({ length: 3 }, (_, c) => td(`R${r + 1} C${c + 1}`)).join('')}</tr>`,
+      ).join('')
+      return (
+        `<div class="dv-smart-table-wrap" contenteditable="false">` +
+        `<table class="dv-smart-table" contenteditable="true">` +
+        `<thead>${headers}</thead>` +
+        `<tbody>${rows}</tbody>` +
+        `</table></div><p><br></p>`
+      )
     },
   },
 

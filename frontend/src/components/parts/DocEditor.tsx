@@ -76,6 +76,7 @@ import MentionsTagsPicker, { type PickerTrigger } from './MentionsTagsPicker'
 import SlashCommandMenu, { type SlashCommand } from './SlashCommandMenu'
 import PencilPicker, { PEN_COLORS, PEN_WIDTHS } from './PencilPicker'
 import FloatingFormatToolbar from './FloatingFormatToolbar'
+import SmartTableController from './SmartTableController'
 import ImageContextToolbar from './ImageContextToolbar'
 import PartNumberPicker from './PartNumberPicker'
 import VersionHistoryPanel from './VersionHistoryPanel'
@@ -2253,6 +2254,10 @@ export default function DocEditor({ partId, partName }: Props): JSX.Element {
       {pickerState === null && slashState === null && (
         <FloatingFormatToolbar editorRef={editorRef} onAfterCommand={persist} />
       )}
+
+      {/* Wires + column / + row buttons and Tab/arrow navigation into
+          every .dv-smart-table-wrap inside the editor. No visible DOM. */}
+      <SmartTableController editorRef={editorRef} onAfterChange={persist} />
 
       {/* Always-visible on-screen indicator when pencil mode is active
           — an unmissable pill at the bottom-centre of the viewport that

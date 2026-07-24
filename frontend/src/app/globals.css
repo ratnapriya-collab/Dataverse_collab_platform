@@ -307,6 +307,230 @@ body {
   color: #0f172a;
 }
 
+/* ── Smart Table ──────────────────────────────────────────────────────
+   A table with interactive controls: hovering the wrapper reveals a
+   `+ column` button at the right edge and a `+ row` button at the
+   bottom. Clicking either appends a fresh cell with placeholder data,
+   auto-labels the new column (Column D, E, F…), and moves the caret.
+   Keyboard navigation across cells uses Tab / Shift+Tab / arrows.
+
+   Wrapping div is required so we can absolute-position the +col button
+   OUTSIDE the table without breaking layout when the table scrolls. */
+.dv-smart-table-wrap {
+  position: relative;
+  display: block;
+  margin: 12px 0;
+  padding: 0 24px 24px 0;  /* room for the +col right, +row bottom */
+}
+.dv-smart-table-wrap > table.dv-smart-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 12.5px;
+}
+.dv-smart-table thead th {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 700;
+  text-align: left;
+  min-width: 80px;
+}
+.dv-smart-table tbody td {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  vertical-align: top;
+  min-width: 80px;
+  transition: background 120ms ease;
+}
+.dv-smart-table tbody tr:hover td {
+  background: rgba(56, 189, 248, 0.05);  /* subtle row hover */
+}
+.dv-smart-table td:focus,
+.dv-smart-table th:focus {
+  outline: 2px solid #0891b2;
+  outline-offset: -2px;
+  background: rgba(6, 182, 212, 0.08);
+}
+
+/* + column button — pinned to the wrapper's right edge. Hidden by
+   default, revealed when the wrapper is hovered so it doesn't clutter
+   the read view. */
+.dv-smart-table-addcol,
+.dv-smart-table-addrow {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px dashed #94a3b8;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease, border-color 120ms ease, color 120ms ease, background 120ms ease;
+  user-select: none;
+}
+.dv-smart-table-wrap:hover .dv-smart-table-addcol,
+.dv-smart-table-wrap:hover .dv-smart-table-addrow {
+  opacity: 1;
+}
+.dv-smart-table-addcol:hover,
+.dv-smart-table-addrow:hover {
+  border-color: #0891b2;
+  color: #0891b2;
+  background: #ecfeff;
+}
+.dv-smart-table-addcol {
+  right: 0;
+  top: 0;
+  bottom: 24px;
+  width: 20px;
+}
+.dv-smart-table-addrow {
+  left: 0;
+  right: 24px;
+  bottom: 0;
+  height: 20px;
+}
+
+/* Row-delete + col-delete micro-buttons that appear on hover of a
+   row header cell / column header cell. Non-destructive — one click
+   removes the row/col. */
+.dv-smart-table-rowbtn,
+.dv-smart-table-colbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+}
+.dv-smart-table tr:hover .dv-smart-table-rowbtn,
+.dv-smart-table th:hover .dv-smart-table-colbtn {
+  opacity: 1;
+}
+.dv-smart-table-rowbtn:hover,
+.dv-smart-table-colbtn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Letter callouts on images (A/B/C… reference markers). Same
+   positioning trick as .dv-image-pin — % coords of the wrapper so they
+   scale with the image on reflow. Different visual: white circle with
+   a black letter, a leader line drawn from the letter towards a table
+   row (visually, in the doc — the reference to a BOM row). */
+.dv-letter-callout {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: ui-serif, Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25), inset 0 0 0 1.5px #0f172a;
+  z-index: 5;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  pointer-events: auto;
+  user-select: none;
+}
+.dv-letter-callout:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35), inset 0 0 0 1.5px #0f172a;
+}
+
+/* Letter-drop mode — while armed, the image gets a black dashed border
+   + crosshair cursor so the user knows the next click will place a
+   letter callout. */
+[data-letterdrop-mode="on"] img {
+  cursor: crosshair !important;
+  outline: 3px dashed #0f172a !important;
+  outline-offset: 2px !important;
+}
+[data-letterdrop-mode="on"] .dv-annotatable {
+  cursor: crosshair !important;
+  outline: 3px dashed #0f172a !important;
+  outline-offset: 2px !important;
+}
+[data-letterdrop-mode="on"] .dv-annotations {
+  pointer-events: none !important;
+}
+
+/* Circled-letter chip that can be inserted inline in body text. Matches
+   the on-image callout so a reader sees "Install the widget ⓐ" in the
+   text and finds the same Ⓐ on the diagram. */
+.dv-letter-ref {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  font-family: ui-serif, Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  color: #0f172a;
+  background: white;
+}
+
+/* Technician view — dims non-technician-critical blocks so the operator
+   sees only the assembly steps + BOM. Applied via a body-level flag. */
+[data-technician-mode="on"] .dv-callout[data-tone="info"],
+[data-technician-mode="on"] blockquote,
+[data-technician-mode="on"] [data-technician-hide="true"] {
+  opacity: 0.35;
+  filter: grayscale(0.5);
+}
+
+/* Publish state badge — pill in the doc header. Draft = amber,
+   Published = emerald. */
+.dv-publish-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid;
+}
+.dv-publish-badge[data-state="draft"] {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fcd34d;
+}
+.dv-publish-badge[data-state="published"] {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #6ee7b7;
+}
+
 /* Numbered comment pins that sit on top of an image. Positioned via
    left/top percentages so they scale with the image on reflow. */
 .dv-image-pin {

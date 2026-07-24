@@ -12,9 +12,9 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { Box, ChevronDown, FileEdit, FileText, ListTree, Sparkles } from 'lucide-react'
+import { Box, ChevronDown, FileEdit, FileText, Layers, ListTree, Sparkles } from 'lucide-react'
 
-export type PartView = '3d' | '2d' | 'bom' | 'doc' | 'pro'
+export type PartView = '3d' | '2d' | 'bom' | 'doc' | 'pro' | 'canvas'
 
 interface Props {
   partId: string
@@ -70,6 +70,13 @@ const TABS: TabSpec[] = [
     href: (id) => `/parts/${id}/pro-viewer`,
     icon: Sparkles,
     hint: 'Measurement · sections · compare',
+  },
+  {
+    id: 'canvas',
+    label: 'Canvas',
+    href: (id) => `/parts/${id}/canvas`,
+    icon: Layers,
+    hint: 'Whiteboard · sticky notes',
   },
 ]
 
